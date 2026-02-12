@@ -1,0 +1,40 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+*.csv
+*.parquet
+*.pkl
+
+# Models
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# Streamlit
+.streamlit/
+
+# Env
+.env
+.env.local
