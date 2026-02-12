@@ -128,10 +128,10 @@ pip install -r requirements.txt
 ### Executar o Dashboard
 
 ```bash
-streamlit run app.py
+python app.py
 ```
 
-O dashboard abre automaticamente em `http://localhost:8501`.
+O dashboard abre em `http://localhost:5000`. Frontend em HTML puro com TailwindCSS + Plotly.js, backend Flask com API REST.
 
 ### Executar via CLI (demo)
 
@@ -152,7 +152,7 @@ Executa uma demonstracao completa no terminal: geracao de dados, clustering, for
 | ML | xgboost, lightgbm |
 | Foundation Model | chronos-forecasting, torch |
 | Clustering | tslearn, scipy |
-| Dashboard | streamlit, plotly |
+| Dashboard | flask, plotly, TailwindCSS, Plotly.js |
 
 ### Nota sobre Chronos
 

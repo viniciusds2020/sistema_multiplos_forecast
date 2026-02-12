@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Forecast Pro{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        brand: { 50:'#eef2ff', 100:'#e0e7ff', 200:'#c7d2fe', 300:'#a5b4fc',
+                                 400:'#818cf8', 500:'#4361ee', 600:'#3a0ca3', 700:'#312e81',
+                                 800:'#1e1b4b', 900:'#0f0f23' },
+                        accent: { green:'#06d6a0', red:'#ef476f', yellow:'#ffd166', blue:'#118ab2' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .sidebar-link { transition: all .2s ease; }
+        .sidebar-link:hover, .sidebar-link.active {
+            background: rgba(255,255,255,.1); border-left: 3px solid #818cf8;
+        }
+        .sidebar-link.active { background: rgba(67,97,238,.2); }
+        .card {
+            background: #fff; border-radius: 16px; border: 1px solid #f1f5f9;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.03);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .card:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+        .kpi-card { border-left: 4px solid var(--kpi-color, #4361ee); }
+        .tab-btn { transition: all .2s ease; }
+        .tab-btn.active { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.08); color: #1e1b4b; }
+        .plotly-chart .modebar { display: none !important; }
+        .plotly-chart:hover .modebar { display: flex !important; }
+        .spinner { border: 3px solid #e2e8f0; border-top-color: #4361ee; border-radius: 50%;
+                   width: 32px; height: 32px; animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn .4s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="w-64 min-h-screen bg-gradient-to-b from-brand-900 via-brand-800 to-brand-700 text-white flex flex-col fixed left-0 top-0 z-30">
+        <!-- Logo -->
+        <div class="px-6 py-6 border-b border-white/10">
+            <div class="text-xl font-extrabold bg-gradient-to-r from-brand-400 to-accent-green bg-clip-text text-transparent">
+                Forecast Pro
+            </div>
+            <div class="text-xs text-gray-400 mt-0.5">Sistema Multi-Produto SKU</div>
+        </div>
+
+        <!-- Nav -->
+        <nav class="flex-1 py-4 space-y-1 px-3">
+            <a href="/" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 {% if active_page=='overview' %}active{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                Overview
+            </a>
+            <a href="/explorer" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 {% if active_page=='explorer' %}active{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Data Explorer
+            </a>
+            <a href="/similarity" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 {% if active_page=='similarity' %}active{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                Similaridade
+            </a>
+            <a href="/forecasting" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 {% if active_page=='forecasting' %}active{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                Forecasting
+            </a>
+            <a href="/comparison" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 {% if active_page=='comparison' %}active{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+                Comparacao
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-white/10 text-center">
+            <div class="text-[10px] text-gray-500">Forecast Pro v1.0</div>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 ml-64 p-6 lg:p-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Helpers JS -->
+    <script>
+        function renderPlotly(elId, chartJson) {
+            const data = JSON.parse(chartJson);
+            Plotly.newPlot(elId, data.data, data.layout, {responsive: true, displayModeBar: false});
+        }
+
+        function showLoading(el) {
+            el.innerHTML = '<div class="flex items-center justify-center py-16"><div class="spinner"></div><span class="ml-3 text-sm text-gray-400">Carregando...</span></div>';
+        }
+
+        function kpiHtml(label, value, color) {
+            return `<div class="card kpi-card p-5" style="--kpi-color:${color}">
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">${label}</div>
+                <div class="text-2xl font-extrabold text-gray-900 mt-1">${value}</div>
+            </div>`;
+        }
+
+        async function fetchJson(url, opts) {
+            const res = await fetch(url, opts);
+            return res.json();
+        }
+
+        async function postJson(url, body) {
+            return fetchJson(url, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(body)
+            });
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

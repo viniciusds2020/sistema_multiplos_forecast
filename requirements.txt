@@ -21,7 +21,7 @@ tslearn>=0.6
 scipy>=1.11
 
 # Dashboard
-streamlit>=1.36
+flask>=3.0
 plotly>=5.18
 
 # Utilities

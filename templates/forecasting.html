@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% set active_page = "forecasting" %}
+{% block title %}Forecasting - Forecast Pro{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Forecasting</h1>
+    <p class="text-sm text-gray-400 mt-1">Treine modelos e gere previsoes por SKU individual ou por cluster agregado</p>
+    <div class="h-px bg-gradient-to-r from-brand-500/40 to-transparent mt-4 mb-6"></div>
+
+    <!-- Mode tabs -->
+    <div class="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 max-w-md">
+        <button onclick="switchMode('individual')" class="tab-btn active flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500" data-mode="individual">Individual (por SKU)</button>
+        <button onclick="switchMode('aggregated')" class="tab-btn flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500" data-mode="aggregated">Agregado (Cluster)</button>
+    </div>
+
+    <!-- Individual mode -->
+    <div id="mode-individual">
+        <div class="card p-4 mb-6">
+            <div class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">SKU</label>
+                    <select id="sel-sku" class="mt-1 block w-56 rounded-lg border border-gray-200 px-3 py-2 text-sm"></select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Modelos</label>
+                    <div id="model-checks" class="mt-1 flex flex-wrap gap-2"></div>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Horizonte</label>
+                    <input type="number" id="inp-horizon" value="30" min="7" max="90"
+                           class="mt-1 block w-20 rounded-lg border border-gray-200 px-2 py-2 text-sm text-center">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Teste (dias)</label>
+                    <input type="number" id="inp-test" value="60" min="30" max="120"
+                           class="mt-1 block w-20 rounded-lg border border-gray-200 px-2 py-2 text-sm text-center">
+                </div>
+                <button onclick="runIndividual()" class="px-5 py-2.5 bg-gradient-to-r from-brand-500 to-brand-600 text-white text-sm font-semibold rounded-lg shadow-md shadow-brand-500/30 hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    Executar Forecast
+                </button>
+            </div>
+        </div>
+
+        <div id="ind-loading" class="hidden flex items-center justify-center py-20">
+            <div class="spinner"></div><span class="ml-3 text-gray-400">Treinando modelos...</span>
+        </div>
+
+        <div id="ind-results" class="hidden">
+            <!-- KPIs -->
+            <div id="ind-kpis" class="grid grid-cols-3 gap-4 mb-6"></div>
+
+            <!-- Overlay chart -->
+            <div class="card p-5 mb-6">
+                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Comparacao de Forecasts</h3>
+                <div id="chart-overlay" class="plotly-chart"></div>
+            </div>
+
+            <!-- Metrics + WAPE -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="card p-5">
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Metricas de Avaliacao</h3>
+                    <div id="ind-metrics-table" class="overflow-x-auto"></div>
+                </div>
+                <div class="card p-5">
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">WAPE por Modelo</h3>
+                    <div id="chart-wape" class="plotly-chart"></div>
+                </div>
+            </div>
+
+            <!-- Detail charts -->
+            <div id="ind-detail-charts" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
+        </div>
+    </div>
+
+    <!-- Aggregated mode -->
+    <div id="mode-aggregated" class="hidden">
+        <div class="card p-4 mb-6">
+            <div class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Metrica Similaridade</label>
+                    <select id="sel-agg-metric" class="mt-1 block w-36 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                        <option value="pearson">Pearson</option><option value="euclidean">Euclidean</option><option value="dtw">DTW</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Rateio</label>
+                    <select id="sel-weight" class="mt-1 block w-32 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                        <option value="rolling">Rolling</option><option value="static">Static</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Modelos</label>
+                    <div id="agg-model-checks" class="mt-1 flex flex-wrap gap-2"></div>
+                </div>
+                <button onclick="runAggregated()" class="px-5 py-2.5 bg-gradient-to-r from-brand-500 to-brand-600 text-white text-sm font-semibold rounded-lg shadow-md shadow-brand-500/30 hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    Executar Forecast Agregado
+                </button>
+            </div>
+        </div>
+
+        <div id="agg-loading" class="hidden flex items-center justify-center py-20">
+            <div class="spinner"></div><span class="ml-3 text-gray-400">Clusterizando e treinando...</span>
+        </div>
+
+        <div id="agg-results" class="hidden">
+            <div id="agg-kpis" class="grid grid-cols-3 gap-4 mb-6"></div>
+            <div id="agg-cluster-charts"></div>
+            <div class="card p-5 mt-6">
+                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Pesos de Rateio Proporcional</h3>
+                <div id="agg-weights" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODELS = ['XGBoost','LightGBM','AutoARIMA','Prophet','CrostonSBA'];
+const MODEL_COLORS = {'XGBoost':'#4361ee','LightGBM':'#06d6a0','AutoARIMA':'#ef476f','Prophet':'#ffd166','Chronos':'#118ab2','CrostonSBA':'#7209b7'};
+
+function switchMode(mode) {
+    document.getElementById('mode-individual').classList.toggle('hidden', mode !== 'individual');
+    document.getElementById('mode-aggregated').classList.toggle('hidden', mode !== 'aggregated');
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+function getSelectedModels(prefix) {
+    return MODELS.filter(m => document.getElementById(`${prefix}-${m}`)?.checked);
+}
+
+function renderModelChecks(containerId, prefix) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = MODELS.map((m,i) => `
+        <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+            <input type="checkbox" id="${prefix}-${m}" ${i < 3 ? 'checked' : ''} class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"> ${m}
+        </label>
+    `).join('');
+}
+
+async function runIndividual() {
+    const skuId = document.getElementById('sel-sku').value;
+    const models = getSelectedModels('mdl');
+    const horizon = parseInt(document.getElementById('inp-horizon').value);
+    const testDays = parseInt(document.getElementById('inp-test').value);
+
+    document.getElementById('ind-results').classList.add('hidden');
+    document.getElementById('ind-loading').classList.remove('hidden');
+
+    const data = await postJson('/api/forecast/individual', { sku_id: skuId, models, horizon, test_days: testDays });
+
+    document.getElementById('ind-loading').classList.add('hidden');
+    document.getElementById('ind-results').classList.remove('hidden');
+
+    // KPIs
+    const bestWape = data.metrics.length ? Math.min(...data.metrics.map(m => m.WAPE)) : '-';
+    const bestModel = data.metrics.length ? data.metrics.find(m => m.WAPE === bestWape)?.Model : '-';
+    document.getElementById('ind-kpis').innerHTML = `
+        ${kpiHtml('Modelos', models.length, '#4361ee')}
+        ${kpiHtml('Melhor WAPE', typeof bestWape === 'number' ? bestWape.toFixed(1)+'%' : '-', '#06d6a0')}
+        ${kpiHtml('Melhor Modelo', bestModel, '#118ab2')}
+    `;
+
+    renderPlotly('chart-overlay', data.overlay_chart);
+    renderPlotly('chart-wape', data.wape_chart);
+
+    // Metrics table
+    if (data.metrics.length) {
+        let html = `<table class="w-full text-sm"><thead><tr class="text-left text-xs font-semibold text-gray-400 uppercase border-b">
+            <th class="pb-2 pr-4">Modelo</th><th class="pb-2 pr-4">MAE</th><th class="pb-2 pr-4">RMSE</th>
+            <th class="pb-2 pr-4">MAPE</th><th class="pb-2 pr-4">WAPE</th><th class="pb-2">Bias</th>
+        </tr></thead><tbody>`;
+        data.metrics.forEach(r => {
+            const isBest = r.WAPE === bestWape;
+            html += `<tr class="border-b border-gray-50 ${isBest ? 'bg-green-50/50' : 'hover:bg-gray-50/50'}">
+                <td class="py-2 pr-4 font-semibold" style="color:${MODEL_COLORS[r.Model]||'#333'}">${r.Model}</td>
+                <td class="py-2 pr-4">${r.MAE}</td><td class="py-2 pr-4">${r.RMSE}</td>
+                <td class="py-2 pr-4">${r.MAPE}</td>
+                <td class="py-2 pr-4 font-bold ${isBest ? 'text-green-600' : ''}">${r.WAPE}</td>
+                <td class="py-2">${r.Bias}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('ind-metrics-table').innerHTML = html;
+    }
+
+    // Detail charts
+    const detailEl = document.getElementById('ind-detail-charts');
+    detailEl.innerHTML = '';
+    for (const [mname, chartJson] of Object.entries(data.detail_charts || {})) {
+        const div = document.createElement('div');
+        div.className = 'card p-5';
+        div.innerHTML = `<h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">${mname}</h3><div id="detail-${mname}" class="plotly-chart"></div>`;
+        detailEl.appendChild(div);
+        setTimeout(() => renderPlotly(`detail-${mname}`, chartJson), 50);
+    }
+
+    if (data.errors && Object.keys(data.errors).length) {
+        for (const [m, err] of Object.entries(data.errors)) {
+            if (err) console.warn(`${m}: ${err}`);
+        }
+    }
+}
+
+async function runAggregated() {
+    const models = getSelectedModels('amdl');
+    const metric = document.getElementById('sel-agg-metric').value;
+    const weightMethod = document.getElementById('sel-weight').value;
+
+    document.getElementById('agg-results').classList.add('hidden');
+    document.getElementById('agg-loading').classList.remove('hidden');
+
+    const data = await postJson('/api/forecast/aggregated', { models, metric, weight_method: weightMethod, horizon: 30, test_days: 60 });
+
+    document.getElementById('agg-loading').classList.add('hidden');
+    document.getElementById('agg-results').classList.remove('hidden');
+
+    document.getElementById('agg-kpis').innerHTML = `
+        ${kpiHtml('Clusters', data.n_clusters, '#4361ee')}
+        ${kpiHtml('Modelos', models.length, '#06d6a0')}
+        ${kpiHtml('Horizonte', '30 dias', '#118ab2')}
+    `;
+
+    // Cluster charts
+    const chartsEl = document.getElementById('agg-cluster-charts');
+    chartsEl.innerHTML = '';
+    for (const [cid, chartJson] of Object.entries(data.charts)) {
+        const div = document.createElement('div');
+        div.className = 'card p-5 mb-6';
+        div.innerHTML = `<h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Cluster ${cid}</h3>
+                          <div id="agg-chart-${cid}" class="plotly-chart"></div>`;
+        // Metrics table
+        if (data.metrics[cid]?.length) {
+            let tbl = `<div class="mt-4 overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs font-semibold text-gray-400 uppercase border-b">
+                <th class="pb-2 pr-4">Modelo</th><th class="pb-2 pr-4">MAE</th><th class="pb-2 pr-4">RMSE</th><th class="pb-2 pr-4">WAPE</th>
+            </tr></thead><tbody>`;
+            data.metrics[cid].forEach(r => {
+                tbl += `<tr class="border-b border-gray-50"><td class="py-2 pr-4 font-semibold" style="color:${MODEL_COLORS[r.Model]||'#333'}">${r.Model}</td>
+                    <td class="py-2 pr-4">${r.MAE}</td><td class="py-2 pr-4">${r.RMSE}</td><td class="py-2 pr-4 font-bold">${r.WAPE}</td></tr>`;
+            });
+            tbl += '</tbody></table></div>';
+            div.innerHTML += tbl;
+        }
+        chartsEl.appendChild(div);
+        setTimeout(() => renderPlotly(`agg-chart-${cid}`, chartJson), 50);
+    }
+
+    // Weights
+    const wEl = document.getElementById('agg-weights');
+    wEl.innerHTML = '';
+    for (const [cid, weights] of Object.entries(data.weights)) {
+        let html = `<div class="border border-gray-100 rounded-lg p-3"><h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Cluster ${cid}</h4>
+        <div class="flex flex-wrap gap-2">`;
+        weights.forEach(w => {
+            html += `<div class="bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                <span class="font-semibold text-gray-700">${w.sku}</span>
+                <span class="ml-2 text-brand-500 font-bold">${w.pct}%</span>
+            </div>`;
+        });
+        html += '</div></div>';
+        wEl.innerHTML += html;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    renderModelChecks('model-checks', 'mdl');
+    renderModelChecks('agg-model-checks', 'amdl');
+
+    const skus = await fetchJson('/api/skus');
+    const sel = document.getElementById('sel-sku');
+    sel.innerHTML = skus.map(s => `<option value="${s.sku_id}">${s.sku_name} (${s.sku_id})</option>`).join('');
+});
+</script>
+{% endblock %}
