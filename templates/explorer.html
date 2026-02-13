@@ -78,18 +78,20 @@ function switchTab(name) {
 async function loadTabData(name) {
     if (name === 'climate') {
         const d = await fetchJson('/api/explorer/climate');
+        if (!d || d.error) { showError('chart-temp', d?.error || 'Erro ao carregar'); return; }
         renderPlotly('chart-temp', d.temperature);
         renderPlotly('chart-rain', d.rainfall);
         renderPlotly('chart-hum', d.humidity);
     } else if (name === 'dist') {
         const d = await fetchJson('/api/explorer/distributions');
+        if (!d || d.error) { showError('chart-season', d?.error || 'Erro ao carregar'); return; }
         renderPlotly('chart-season', d.season);
         renderPlotly('chart-dow', d.dow);
         renderPlotly('chart-safra', d.safra);
         renderPlotly('chart-profile', d.profile);
     } else if (name === 'raw') {
         const rows = await fetchJson('/api/explorer/raw');
-        if (!rows.length) return;
+        if (!rows || rows.error || !rows.length) { showError('raw-table', rows?.error || 'Sem dados'); return; }
         const cols = Object.keys(rows[0]);
         let html = `<table class="w-full text-xs"><thead><tr class="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b">`;
         cols.forEach(c => html += `<th class="pb-2 pr-3 whitespace-nowrap">${c}</th>`);
@@ -106,9 +108,11 @@ async function loadTabData(name) {
 
 async function loadDemand() {
     const skus = Array.from(selectedSkus);
+    if (!skus.length) { showError('chart-demand', 'Selecione ao menos 1 SKU'); return; }
     const params = skus.map(s => `skus=${encodeURIComponent(s)}`).join('&');
     showLoading(document.getElementById('chart-demand'));
     const d = await fetchJson('/api/explorer/demand?' + params);
+    if (!d || d.error) { showError('chart-demand', d?.error || 'Erro ao carregar'); return; }
     renderPlotly('chart-demand', d.chart);
 }
 
@@ -131,6 +135,7 @@ function renderChips() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     allSkus = await fetchJson('/api/skus');
+    if (!allSkus || allSkus.error) { allSkus = []; showError('chart-demand', 'Erro ao carregar SKUs'); return; }
     allSkus.slice(0,4).forEach(s => selectedSkus.add(s.sku_name));
     renderChips();
     loadDemand();

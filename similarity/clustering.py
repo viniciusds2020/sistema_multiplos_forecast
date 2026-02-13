@@ -33,6 +33,8 @@ def compute_distance_matrix(
         Matriz de distancia (n_skus, n_skus).
     """
     n = matrix.shape[0]
+    if n < 2:
+        raise ValueError(f"Necessario ao menos 2 SKUs para calcular distancia, mas encontrou {n}.")
 
     # Z-normalizar
     scaler = StandardScaler()
@@ -139,4 +141,8 @@ def get_cluster_summary(
     ).reset_index()
 
     summary["cv"] = (summary["std_demand"] / summary["mean_demand"].replace(0, np.nan)).round(3)
+    # Arredondar colunas numericas para evitar problemas de serializacao
+    for col in ["mean_demand", "std_demand", "total_demand", "zero_pct"]:
+        if col in summary.columns:
+            summary[col] = summary[col].round(2)
     return summary

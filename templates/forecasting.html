@@ -151,6 +151,13 @@ async function runIndividual() {
     const data = await postJson('/api/forecast/individual', { sku_id: skuId, models, horizon, test_days: testDays });
 
     document.getElementById('ind-loading').classList.add('hidden');
+
+    if (!data || data.error) {
+        showError('ind-loading', data?.error || 'Erro ao executar forecast');
+        document.getElementById('ind-loading').classList.remove('hidden');
+        return;
+    }
+
     document.getElementById('ind-results').classList.remove('hidden');
 
     // KPIs
@@ -214,6 +221,13 @@ async function runAggregated() {
     const data = await postJson('/api/forecast/aggregated', { models, metric, weight_method: weightMethod, horizon: 30, test_days: 60 });
 
     document.getElementById('agg-loading').classList.add('hidden');
+
+    if (!data || data.error) {
+        showError('agg-loading', data?.error || 'Erro ao executar forecast agregado');
+        document.getElementById('agg-loading').classList.remove('hidden');
+        return;
+    }
+
     document.getElementById('agg-results').classList.remove('hidden');
 
     document.getElementById('agg-kpis').innerHTML = `
@@ -268,6 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderModelChecks('agg-model-checks', 'amdl');
 
     const skus = await fetchJson('/api/skus');
+    if (!skus || skus.error) return;
     const sel = document.getElementById('sel-sku');
     sel.innerHTML = skus.map(s => `<option value="${s.sku_id}">${s.sku_name} (${s.sku_id})</option>`).join('');
 });

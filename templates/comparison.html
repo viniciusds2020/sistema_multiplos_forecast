@@ -110,6 +110,13 @@ async function runComparison() {
     cmpData = await postJson('/api/comparison/run', { models, sku_ids: skuIds, horizon: 30, test_days: 60 });
 
     document.getElementById('cmp-loading').classList.add('hidden');
+
+    if (!cmpData || cmpData.error) {
+        showError('cmp-loading', cmpData?.error || 'Erro ao executar comparacao');
+        document.getElementById('cmp-loading').classList.remove('hidden');
+        return;
+    }
+
     document.getElementById('cmp-results').classList.remove('hidden');
 
     // Avg table
@@ -130,10 +137,12 @@ async function runComparison() {
         document.getElementById('avg-table').innerHTML = html;
     }
 
-    renderPlotly('chart-best', cmpData.charts.best_count);
-    renderPlotly('chart-radar', cmpData.charts.radar);
-    renderPlotly('chart-box', cmpData.charts.box_wape);
-    renderPlotly('chart-grouped', cmpData.charts.grouped_bar);
+    if (cmpData.charts) {
+        renderPlotly('chart-best', cmpData.charts.best_count);
+        renderPlotly('chart-radar', cmpData.charts.radar);
+        renderPlotly('chart-box', cmpData.charts.box_wape);
+        renderPlotly('chart-grouped', cmpData.charts.grouped_bar);
+    }
 
     // SKU selector
     const skuSel = document.getElementById('sel-cmp-sku');
@@ -180,6 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // SKU checks
     allSkuList = await fetchJson('/api/skus');
+    if (!allSkuList || allSkuList.error) { allSkuList = []; return; }
     document.getElementById('cmp-sku-checks').innerHTML = allSkuList.map((s,i) => `
         <label class="flex items-center gap-1 text-[11px] font-medium text-gray-600">
             <input type="checkbox" id="csku-${s.sku_id}" ${i<6?'checked':''} class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"> ${s.sku_name}

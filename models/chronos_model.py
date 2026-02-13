@@ -19,27 +19,31 @@ class ChronosForecaster(BaseForecaster):
     def fit(self, y: pd.Series, X: pd.DataFrame = None) -> "ChronosForecaster":
         try:
             import torch
-            from chronos import ChronosBoltPipeline
-            self.pipeline = ChronosBoltPipeline.from_pretrained(
-                self.model_id,
-                device_map=self.device,
-                torch_dtype=torch.float32,
-            )
-        except ImportError:
-            from chronos import ChronosPipeline
-            import torch
-            self.pipeline = ChronosPipeline.from_pretrained(
-                self.model_id,
-                device_map=self.device,
-                torch_dtype=torch.float32,
-            )
+            try:
+                from chronos import ChronosBoltPipeline
+                self.pipeline = ChronosBoltPipeline.from_pretrained(
+                    self.model_id,
+                    device_map=self.device,
+                    torch_dtype=torch.float32,
+                )
+            except (ImportError, Exception):
+                from chronos import ChronosPipeline
+                self.pipeline = ChronosPipeline.from_pretrained(
+                    self.model_id,
+                    device_map=self.device,
+                    torch_dtype=torch.float32,
+                )
 
-        import torch
-        self._context = torch.tensor(y.values, dtype=torch.float32)
-        self._last_date = y.index[-1]
+            self._context = torch.tensor(y.values, dtype=torch.float32)
+            self._last_date = y.index[-1]
+        except Exception as e:
+            raise RuntimeError(f"Chronos nao disponivel: {e}. Instale com: pip install chronos-forecasting torch")
         return self
 
     def predict(self, horizon: int, X_future: pd.DataFrame = None) -> pd.DataFrame:
+        if self.pipeline is None:
+            raise RuntimeError("Modelo Chronos nao foi treinado. Chame fit() primeiro.")
+
         import torch
 
         forecast = self.pipeline.predict(
@@ -49,7 +53,7 @@ class ChronosForecaster(BaseForecaster):
         )
 
         # forecast shape: (1, num_samples, horizon)
-        forecast_np = forecast.numpy()[0]
+        forecast_np = forecast.numpy()[0] if hasattr(forecast, 'numpy') else np.array(forecast)[0]
 
         yhat = np.median(forecast_np, axis=0)
         yhat_lower = np.percentile(forecast_np, 10, axis=0)

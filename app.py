@@ -2,6 +2,7 @@
 
 import sys
 import json
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -15,7 +16,6 @@ from flask import Flask, render_template, jsonify, request
 
 from config import COLORS, MODEL_COLORS
 from data.synthetic_generator import generate_synthetic_data
-from data.feature_engineering import prepare_ml_features, get_feature_columns
 from similarity.clustering import (
     build_demand_matrix, compute_distance_matrix,
     find_optimal_clusters, cluster_series, compute_mds_projection,
@@ -27,9 +27,36 @@ from similarity.aggregation import (
 )
 from pipeline.forecasting_pipeline import run_forecast_pipeline
 from pipeline.cluster_pipeline import run_cluster_analysis, run_cluster_forecast_pipeline
-from evaluation.metrics import calculate_all_metrics
 
 app = Flask(__name__)
+
+
+# ---------------------------------------------------------------------------
+# JSON Encoder customizado para tipos numpy/pandas
+# ---------------------------------------------------------------------------
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, pd.Timestamp):
+            return obj.strftime("%Y-%m-%d")
+        return super().default(obj)
+
+
+app.json_encoder = NumpyEncoder
+
+
+def safe_jsonify(data):
+    """jsonify seguro que converte tipos numpy automaticamente."""
+    cleaned = json.loads(json.dumps(data, cls=NumpyEncoder))
+    return jsonify(cleaned)
+
 
 # ---------------------------------------------------------------------------
 # Cache global de dados
@@ -48,6 +75,21 @@ def get_data() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 def fig_to_json(fig: go.Figure) -> str:
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+
+def _hex_to_rgba(hex_color: str, alpha: float = 0.1) -> str:
+    """Converte cor hex para rgba string."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def _dates_to_str(series: pd.Series) -> list:
+    """Converte datas para strings de forma segura."""
+    try:
+        return series.dt.strftime("%Y-%m-%d").tolist()
+    except Exception:
+        return series.astype(str).tolist()
 
 
 def base_layout(title="", height=440):
@@ -98,9 +140,9 @@ def page_comparison():
 @app.route("/api/kpis")
 def api_kpis():
     df = get_data()
-    return jsonify({
+    return safe_jsonify({
         "total_skus": int(df["sku_id"].nunique()),
-        "total_records": len(df),
+        "total_records": int(len(df)),
         "coverage_days": int((df["date"].max() - df["date"].min()).days),
         "avg_demand": round(float(df["demand"].mean()), 1),
         "date_start": str(df["date"].min().date()),
@@ -117,67 +159,79 @@ def api_skus():
         .reset_index()
     )
     skus["mean_demand"] = skus["mean_demand"].round(1)
-    return jsonify(skus.to_dict(orient="records"))
+    skus["total_demand"] = skus["total_demand"].astype(int)
+    return safe_jsonify(skus.to_dict(orient="records"))
 
 
 @app.route("/api/overview/charts")
 def api_overview_charts():
-    df = get_data()
-    charts = {}
+    try:
+        df = get_data()
+        charts = {}
 
-    # 1 - Heatmap SKU x Mes
-    dfm = df.copy()
-    dfm["ym"] = dfm["date"].dt.to_period("M").astype(str)
-    pivot = dfm.pivot_table(index="sku_name", columns="ym", values="demand", aggfunc="sum").fillna(0)
-    fig = go.Figure(go.Heatmap(
-        z=pivot.values.tolist(), x=pivot.columns.tolist(), y=pivot.index.tolist(),
-        colorscale=[[0,"#f8fafc"],[.25,"#c7d2fe"],[.5,"#818cf8"],[.75,"#4f46e5"],[1,"#1e1b4b"]],
-        colorbar=dict(title="Demanda"),
-    ))
-    fig.update_layout(**base_layout("", 480), xaxis=dict(tickangle=-45))
-    charts["heatmap"] = fig_to_json(fig)
+        # 1 - Heatmap SKU x Mes
+        dfm = df.copy()
+        dfm["ym"] = dfm["date"].dt.to_period("M").astype(str)
+        pivot = dfm.pivot_table(index="sku_name", columns="ym", values="demand", aggfunc="sum").fillna(0)
+        fig = go.Figure(go.Heatmap(
+            z=pivot.values.tolist(), x=pivot.columns.tolist(), y=pivot.index.tolist(),
+            colorscale=[[0, "#f8fafc"], [.25, "#c7d2fe"], [.5, "#818cf8"], [.75, "#4f46e5"], [1, "#1e1b4b"]],
+            colorbar=dict(title="Demanda"),
+        ))
+        fig.update_layout(**base_layout("", 480))
+        fig.update_xaxes(tickangle=-45)
+        charts["heatmap"] = fig_to_json(fig)
 
-    # 2 - Top 10 SKUs
-    top = df.groupby(["sku_id","sku_name"])["demand"].sum().reset_index().sort_values("demand", ascending=True).tail(10)
-    fig = go.Figure(go.Bar(x=top["demand"], y=top["sku_name"], orientation="h",
-                           marker=dict(color=top["demand"], colorscale=[[0,"#818cf8"],[1,"#4361ee"]])))
-    fig.update_layout(**base_layout("", 420), yaxis=dict(title=""), xaxis=dict(title="Demanda Total"))
-    charts["top_skus"] = fig_to_json(fig)
+        # 2 - Top 10 SKUs
+        top = df.groupby(["sku_id", "sku_name"])["demand"].sum().reset_index().sort_values("demand", ascending=True).tail(10)
+        fig = go.Figure(go.Bar(
+            x=top["demand"].tolist(), y=top["sku_name"].tolist(), orientation="h",
+            marker=dict(color=top["demand"].tolist(), colorscale=[[0, "#818cf8"], [1, "#4361ee"]])))
+        fig.update_layout(**base_layout("", 420))
+        fig.update_xaxes(title="Demanda Total")
+        fig.update_yaxes(title="")
+        charts["top_skus"] = fig_to_json(fig)
 
-    # 3 - Demanda total agregada
-    daily = df.groupby("date")["demand"].sum().reset_index()
-    daily["ma28"] = daily["demand"].rolling(28).mean()
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=daily["date"].dt.strftime("%Y-%m-%d"), y=daily["demand"],
-                             mode="lines", fill="tozeroy", fillcolor="rgba(67,97,238,.08)",
-                             line=dict(color="#4361ee", width=1.5), name="Demanda Total"))
-    fig.add_trace(go.Scatter(x=daily["date"].dt.strftime("%Y-%m-%d"), y=daily["ma28"],
-                             mode="lines", line=dict(color="#ef476f", width=2.5, dash="dash"), name="MM 28d"))
-    fig.update_layout(**base_layout("", 380))
-    charts["total_demand"] = fig_to_json(fig)
+        # 3 - Demanda total agregada
+        daily = df.groupby("date")["demand"].sum().reset_index()
+        daily["ma28"] = daily["demand"].rolling(28).mean()
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=_dates_to_str(daily["date"]), y=daily["demand"].tolist(),
+            mode="lines", fill="tozeroy", fillcolor="rgba(67,97,238,.08)",
+            line=dict(color="#4361ee", width=1.5), name="Demanda Total"))
+        fig.add_trace(go.Scatter(
+            x=_dates_to_str(daily["date"]), y=daily["ma28"].tolist(),
+            mode="lines", line=dict(color="#ef476f", width=2.5, dash="dash"), name="MM 28d"))
+        fig.update_layout(**base_layout("", 380))
+        charts["total_demand"] = fig_to_json(fig)
 
-    # 4 - Perfis donut
-    pc = df.groupby("demand_profile")["sku_id"].nunique().reset_index()
-    pc.columns = ["profile", "count"]
-    colors_pie = ["#4361ee","#06d6a0","#ffd166","#ef476f","#118ab2"]
-    fig = go.Figure(go.Pie(labels=pc["profile"], values=pc["count"],
-                           marker=dict(colors=colors_pie[:len(pc)]), hole=.45,
-                           textinfo="label+percent", textfont=dict(size=12)))
-    fig.update_layout(height=380, paper_bgcolor="white", showlegend=False,
-                      font=dict(family="Inter"))
-    charts["profiles"] = fig_to_json(fig)
+        # 4 - Perfis donut
+        pc = df.groupby("demand_profile")["sku_id"].nunique().reset_index()
+        pc.columns = ["profile", "count"]
+        colors_pie = ["#4361ee", "#06d6a0", "#ffd166", "#ef476f", "#118ab2"]
+        fig = go.Figure(go.Pie(
+            labels=pc["profile"].tolist(), values=pc["count"].tolist(),
+            marker=dict(colors=colors_pie[:len(pc)]), hole=.45,
+            textinfo="label+percent", textfont=dict(size=12)))
+        fig.update_layout(height=380, paper_bgcolor="white", showlegend=False, font=dict(family="Inter"))
+        charts["profiles"] = fig_to_json(fig)
 
-    # 5 - Tabela estatisticas
-    stats = df.groupby("demand_profile").agg(
-        skus=("sku_id","nunique"), media=("demand","mean"),
-        desvio=("demand","std"), maximo=("demand","max"),
-        zero_pct=("demand", lambda x: round((x==0).mean()*100, 1)),
-    ).reset_index()
-    stats["media"] = stats["media"].round(1)
-    stats["desvio"] = stats["desvio"].round(1)
-    charts["stats_table"] = stats.to_dict(orient="records")
+        # 5 - Tabela estatisticas
+        stats = df.groupby("demand_profile").agg(
+            skus=("sku_id", "nunique"), media=("demand", "mean"),
+            desvio=("demand", "std"), maximo=("demand", "max"),
+            zero_pct=("demand", lambda x: round(float((x == 0).mean() * 100), 1)),
+        ).reset_index()
+        stats["media"] = stats["media"].round(1).astype(float)
+        stats["desvio"] = stats["desvio"].round(1).astype(float)
+        stats["maximo"] = stats["maximo"].astype(int)
+        stats["skus"] = stats["skus"].astype(int)
+        charts["stats_table"] = json.loads(stats.to_json(orient="records"))
 
-    return jsonify(charts)
+        return safe_jsonify(charts)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ===================================================================
@@ -193,9 +247,12 @@ def api_explorer_demand():
     fig = go.Figure()
     for i, sku in enumerate(skus):
         s = filtered[filtered["sku_name"] == sku]
-        fig.add_trace(go.Scatter(x=s["date"].dt.strftime("%Y-%m-%d"), y=s["demand"],
-                                 mode="lines", name=sku,
-                                 line=dict(color=colors[i % len(colors)], width=1.5)))
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=_dates_to_str(s["date"]), y=s["demand"].tolist(),
+            mode="lines", name=sku,
+            line=dict(color=colors[i % len(colors)], width=1.5)))
     fig.update_layout(**base_layout("", 460))
     return jsonify({"chart": fig_to_json(fig)})
 
@@ -204,20 +261,23 @@ def api_explorer_demand():
 def api_explorer_climate():
     df = get_data()
     c = df.drop_duplicates("date").sort_values("date")
-    dates = c["date"].dt.strftime("%Y-%m-%d")
+    dates = _dates_to_str(c["date"])
 
-    fig_temp = go.Figure(go.Scatter(x=dates, y=c["temperature"], mode="lines",
-                                     fill="tozeroy", fillcolor="rgba(239,71,111,.08)",
-                                     line=dict(color="#ef476f", width=1.5)))
+    fig_temp = go.Figure(go.Scatter(
+        x=dates, y=c["temperature"].tolist(), mode="lines",
+        fill="tozeroy", fillcolor="rgba(239,71,111,.08)",
+        line=dict(color="#ef476f", width=1.5)))
     fig_temp.update_layout(**base_layout("Temperatura (C)", 320))
 
-    fig_rain = go.Figure(go.Bar(x=dates, y=c["rainfall"],
-                                 marker=dict(color="#118ab2", opacity=.7)))
+    fig_rain = go.Figure(go.Bar(
+        x=dates, y=c["rainfall"].tolist(),
+        marker=dict(color="#118ab2", opacity=.7)))
     fig_rain.update_layout(**base_layout("Precipitacao (mm)", 320))
 
-    fig_hum = go.Figure(go.Scatter(x=dates, y=c["humidity"], mode="lines",
-                                    fill="tozeroy", fillcolor="rgba(6,214,160,.08)",
-                                    line=dict(color="#06d6a0", width=1.5)))
+    fig_hum = go.Figure(go.Scatter(
+        x=dates, y=c["humidity"].tolist(), mode="lines",
+        fill="tozeroy", fillcolor="rgba(6,214,160,.08)",
+        line=dict(color="#06d6a0", width=1.5)))
     fig_hum.update_layout(**base_layout("Umidade (%)", 320))
 
     return jsonify({
@@ -232,21 +292,22 @@ def api_explorer_distributions():
     df = get_data()
 
     fig_season = px.box(df, x="season", y="demand", color="season",
-                         color_discrete_map={"verao":"#ef476f","outono":"#ffd166",
-                                             "inverno":"#118ab2","primavera":"#06d6a0"},
-                         category_orders={"season":["verao","outono","inverno","primavera"]})
+                         color_discrete_map={"verao": "#ef476f", "outono": "#ffd166",
+                                             "inverno": "#118ab2", "primavera": "#06d6a0"},
+                         category_orders={"season": ["verao", "outono", "inverno", "primavera"]})
     fig_season.update_layout(**base_layout("Demanda por Estacao", 380), showlegend=False,
                               xaxis_title="Estacao", yaxis_title="Demanda")
 
-    dow = {0:"Seg",1:"Ter",2:"Qua",3:"Qui",4:"Sex",5:"Sab",6:"Dom"}
-    dfd = df.copy(); dfd["dow"] = dfd["day_of_week"].map(dow)
-    fig_dow = px.box(dfd, x="dow", y="demand", category_orders={"dow":list(dow.values())})
+    dow = {0: "Seg", 1: "Ter", 2: "Qua", 3: "Qui", 4: "Sex", 5: "Sab", 6: "Dom"}
+    dfd = df.copy()
+    dfd["dow"] = dfd["day_of_week"].map(dow)
+    fig_dow = px.box(dfd, x="dow", y="demand", category_orders={"dow": list(dow.values())})
     fig_dow.update_traces(marker_color="#4361ee")
     fig_dow.update_layout(**base_layout("Demanda por Dia da Semana", 380),
                            xaxis_title="Dia", yaxis_title="Demanda")
 
     fig_safra = px.box(df, x="safra_soja", y="demand", color="safra_soja",
-                        category_orders={"safra_soja":["plantio","crescimento","colheita","entressafra"]})
+                        category_orders={"safra_soja": ["plantio", "crescimento", "colheita", "entressafra"]})
     fig_safra.update_layout(**base_layout("Demanda por Fase Safra (Soja)", 380),
                              showlegend=False, xaxis_title="Fase", yaxis_title="Demanda")
 
@@ -265,9 +326,9 @@ def api_explorer_distributions():
 @app.route("/api/explorer/raw")
 def api_explorer_raw():
     df = get_data()
-    sample = df.sort_values(["sku_id","date"]).head(300).copy()
+    sample = df.sort_values(["sku_id", "date"]).head(300).copy()
     sample["date"] = sample["date"].dt.strftime("%Y-%m-%d")
-    return jsonify(sample.to_dict(orient="records"))
+    return safe_jsonify(sample.to_dict(orient="records"))
 
 
 # ===================================================================
@@ -275,173 +336,198 @@ def api_explorer_raw():
 # ===================================================================
 @app.route("/api/similarity/run", methods=["POST"])
 def api_similarity_run():
-    df = get_data()
-    body = request.get_json(silent=True) or {}
-    metric = body.get("metric", "pearson")
-    auto_k = body.get("auto_k", True)
-    manual_k = body.get("manual_k", 4)
+    try:
+        df = get_data()
+        body = request.get_json(silent=True) or {}
+        metric = body.get("metric", "pearson")
+        auto_k = body.get("auto_k", True)
+        manual_k = body.get("manual_k", 4)
 
-    matrix, sku_ids = build_demand_matrix(df)
-    dist_matrix = compute_distance_matrix(matrix, metric=metric)
+        matrix, sku_ids = build_demand_matrix(df)
 
-    if auto_k:
-        n_clusters, sil_scores = find_optimal_clusters(matrix, dist_matrix)
-    else:
-        n_clusters = manual_k
-        _, sil_scores = find_optimal_clusters(matrix, dist_matrix)
+        if matrix.shape[0] < 2:
+            return jsonify({"error": "Sao necessarios pelo menos 2 SKUs para clustering"}), 400
 
-    labels, Z = cluster_series(dist_matrix, n_clusters)
-    mds = compute_mds_projection(dist_matrix)
-    summary = get_cluster_summary(df, sku_ids, labels)
+        dist_matrix = compute_distance_matrix(matrix, metric=metric)
 
-    # Guardar no cache
-    _cache["cluster_info"] = {
-        "sku_ids": sku_ids, "labels": labels.tolist(), "linkage": Z.tolist(),
-        "n_clusters": int(n_clusters), "dist_matrix": dist_matrix.tolist(),
-    }
+        if auto_k:
+            n_clusters, sil_scores = find_optimal_clusters(matrix, dist_matrix)
+        else:
+            n_clusters = manual_k
+            _, sil_scores = find_optimal_clusters(matrix, dist_matrix)
 
-    charts = {}
+        labels, Z = cluster_series(dist_matrix, n_clusters)
+        mds = compute_mds_projection(dist_matrix)
+        summary = get_cluster_summary(df, sku_ids, labels)
 
-    # Heatmap de distancia (reordenado por cluster)
-    order = np.argsort(labels)
-    od = dist_matrix[order][:, order]
-    on = [sku_ids[i] for i in order]
-    fig = go.Figure(go.Heatmap(z=od.tolist(), x=on, y=on,
-                                colorscale=[[0,"#06d6a0"],[.3,"#ffd166"],[.6,"#ef476f"],[1,"#1a1a2e"]],
-                                colorbar=dict(title="Dist")))
-    fig.update_layout(**base_layout("", 460), xaxis=dict(tickangle=-45, tickfont=dict(size=9)),
-                       yaxis=dict(tickfont=dict(size=9)))
-    charts["dist_heatmap"] = fig_to_json(fig)
+        # Guardar no cache
+        _cache["cluster_info"] = {
+            "sku_ids": sku_ids,
+            "labels": [int(x) for x in labels],
+            "linkage": [[float(v) for v in row] for row in Z],
+            "n_clusters": int(n_clusters),
+        }
 
-    # Silhouette bar
-    ks = sorted(sil_scores.keys()); sc = [sil_scores[k] for k in ks]
-    fig = go.Figure(go.Bar(x=[str(k) for k in ks], y=sc,
-                           marker=dict(color=["#4361ee" if k != n_clusters else "#06d6a0" for k in ks]),
-                           text=[f"{s:.3f}" for s in sc], textposition="outside"))
-    fig.update_layout(**base_layout("", 420), xaxis_title="K", yaxis_title="Silhouette")
-    charts["silhouette"] = fig_to_json(fig)
+        charts = {}
 
-    # MDS 2D scatter
-    cl_colors = px.colors.qualitative.Set2[:n_clusters]
-    fig = go.Figure()
-    for c in sorted(set(labels)):
-        idxs = np.where(labels == c)[0]
-        fig.add_trace(go.Scatter(
-            x=mds[idxs, 0].tolist(), y=mds[idxs, 1].tolist(), mode="markers+text",
-            name=f"Cluster {c}", text=[sku_ids[i] for i in idxs], textposition="top center",
-            textfont=dict(size=9), marker=dict(size=12, color=cl_colors[c-1] if c <= len(cl_colors) else "#4361ee")))
-    fig.update_layout(**base_layout("", 460), xaxis_title="MDS 1", yaxis_title="MDS 2")
-    charts["mds"] = fig_to_json(fig)
+        # Heatmap de distancia (reordenado por cluster)
+        order = np.argsort(labels)
+        od = dist_matrix[order][:, order]
+        on = [sku_ids[i] for i in order]
+        fig = go.Figure(go.Heatmap(
+            z=od.tolist(), x=on, y=on,
+            colorscale=[[0, "#06d6a0"], [.3, "#ffd166"], [.6, "#ef476f"], [1, "#1a1a2e"]],
+            colorbar=dict(title="Dist")))
+        fig.update_layout(**base_layout("", 460))
+        fig.update_xaxes(tickangle=-45, tickfont=dict(size=9))
+        fig.update_yaxes(tickfont=dict(size=9))
+        charts["dist_heatmap"] = fig_to_json(fig)
 
-    # Dendrograma
-    from scipy.cluster.hierarchy import dendrogram as scipy_dendro
-    dd = scipy_dendro(Z, labels=sku_ids, no_plot=True)
-    fig = go.Figure()
-    for xs, ys in zip(dd["icoord"], dd["dcoord"]):
-        fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines",
-                                  line=dict(color="#4361ee", width=1.5), showlegend=False))
-    fig.update_layout(**base_layout("", 440),
-                       xaxis=dict(title="SKUs", ticktext=dd["ivl"],
-                                  tickvals=list(range(5, len(dd["ivl"])*10+5, 10)),
-                                  tickangle=-45, tickfont=dict(size=9)),
-                       yaxis=dict(title="Distancia"))
-    charts["dendro"] = fig_to_json(fig)
+        # Silhouette bar
+        ks = sorted(sil_scores.keys())
+        sc = [float(sil_scores[k]) for k in ks]
+        fig = go.Figure(go.Bar(
+            x=[str(k) for k in ks], y=sc,
+            marker=dict(color=["#4361ee" if k != n_clusters else "#06d6a0" for k in ks]),
+            text=[f"{s:.3f}" for s in sc], textposition="outside"))
+        fig.update_layout(**base_layout("", 420), xaxis_title="K", yaxis_title="Silhouette")
+        charts["silhouette"] = fig_to_json(fig)
 
-    # Series por cluster
-    cluster_series_charts = {}
-    colors_cycle = px.colors.qualitative.Set2
-    for c in sorted(set(labels)):
-        c_ids = [sku_ids[i] for i in np.where(labels == c)[0]]
+        # MDS 2D scatter
+        cl_colors = px.colors.qualitative.Set2[:n_clusters]
         fig = go.Figure()
-        for i, sid in enumerate(c_ids):
-            sd = df[df["sku_id"] == sid].sort_values("date")
-            fig.add_trace(go.Scatter(x=sd["date"].dt.strftime("%Y-%m-%d"), y=sd["demand"],
-                                      mode="lines", name=sd["sku_name"].iloc[0],
-                                      line=dict(color=colors_cycle[i % len(colors_cycle)], width=1.5)))
-        fig.update_layout(**base_layout(f"Cluster {c}", 360))
-        cluster_series_charts[str(c)] = fig_to_json(fig)
+        for c_val in sorted(set(labels)):
+            idxs = np.where(labels == c_val)[0]
+            fig.add_trace(go.Scatter(
+                x=mds[idxs, 0].tolist(), y=mds[idxs, 1].tolist(), mode="markers+text",
+                name=f"Cluster {c_val}",
+                text=[sku_ids[i] for i in idxs], textposition="top center",
+                textfont=dict(size=9),
+                marker=dict(size=12, color=cl_colors[int(c_val) - 1] if int(c_val) <= len(cl_colors) else "#4361ee")))
+        fig.update_layout(**base_layout("", 460), xaxis_title="MDS 1", yaxis_title="MDS 2")
+        charts["mds"] = fig_to_json(fig)
 
-    charts["cluster_series"] = cluster_series_charts
+        # Dendrograma
+        from scipy.cluster.hierarchy import dendrogram as scipy_dendro
+        dd = scipy_dendro(Z, labels=sku_ids, no_plot=True)
+        fig = go.Figure()
+        for xs, ys in zip(dd["icoord"], dd["dcoord"]):
+            fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines",
+                                      line=dict(color="#4361ee", width=1.5), showlegend=False))
+        fig.update_layout(**base_layout("", 440))
+        fig.update_xaxes(title="SKUs", ticktext=dd["ivl"],
+                         tickvals=list(range(5, len(dd["ivl"]) * 10 + 5, 10)),
+                         tickangle=-45, tickfont=dict(size=9))
+        fig.update_yaxes(title="Distancia")
+        charts["dendro"] = fig_to_json(fig)
 
-    # Tabela resumo
-    display = summary[["cluster","sku_id","sku_name","demand_profile","mean_demand","cv","zero_pct"]].copy()
-    display["mean_demand"] = display["mean_demand"].round(1)
-    display["cv"] = display["cv"].round(3)
-    display["zero_pct"] = display["zero_pct"].round(1)
+        # Series por cluster
+        cluster_series_charts = {}
+        colors_cycle = px.colors.qualitative.Set2
+        for c_val in sorted(set(labels)):
+            c_ids = [sku_ids[i] for i in np.where(labels == c_val)[0]]
+            fig = go.Figure()
+            for i, sid in enumerate(c_ids):
+                sd = df[df["sku_id"] == sid].sort_values("date")
+                if sd.empty:
+                    continue
+                fig.add_trace(go.Scatter(
+                    x=_dates_to_str(sd["date"]), y=sd["demand"].tolist(),
+                    mode="lines", name=sd["sku_name"].iloc[0],
+                    line=dict(color=colors_cycle[i % len(colors_cycle)], width=1.5)))
+            fig.update_layout(**base_layout(f"Cluster {c_val}", 360))
+            cluster_series_charts[str(int(c_val))] = fig_to_json(fig)
 
-    return jsonify({
-        "charts": charts,
-        "n_clusters": int(n_clusters),
-        "sil_best": round(float(max(sil_scores.values())), 3) if sil_scores else 0,
-        "total_skus": len(sku_ids),
-        "summary": display.to_dict(orient="records"),
-    })
+        charts["cluster_series"] = cluster_series_charts
+
+        # Tabela resumo
+        display_cols = ["cluster", "sku_id", "sku_name", "demand_profile", "mean_demand", "cv", "zero_pct"]
+        avail = [c for c in display_cols if c in summary.columns]
+        display = summary[avail].copy()
+        for col in ["mean_demand", "cv", "zero_pct"]:
+            if col in display.columns:
+                display[col] = display[col].round(3).astype(float)
+        display["cluster"] = display["cluster"].astype(int)
+
+        return safe_jsonify({
+            "charts": charts,
+            "n_clusters": int(n_clusters),
+            "sil_best": round(float(max(sil_scores.values())), 3) if sil_scores else 0,
+            "total_skus": len(sku_ids),
+            "summary": json.loads(display.to_json(orient="records")),
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ===================================================================
-# API - FORECASTING
+# Helpers para montar charts de forecast
 # ===================================================================
-@app.route("/api/forecast/individual", methods=["POST"])
-def api_forecast_individual():
-    df = get_data()
-    body = request.get_json(silent=True) or {}
-    sku_id = body.get("sku_id")
-    models = body.get("models", ["XGBoost", "LightGBM", "AutoARIMA"])
-    horizon = body.get("horizon", 30)
-    test_days = body.get("test_days", 60)
-
-    if not sku_id:
-        return jsonify({"error": "sku_id obrigatorio"}), 400
-
-    results = run_forecast_pipeline(df, sku_id, models, test_days, horizon)
-
+def _build_forecast_overlay(df, sku_id, results, test_days):
+    """Monta chart overlay, charts individuais, metricas para um SKU."""
     sku_data = df[df["sku_id"] == sku_id].sort_values("date")
-    train = sku_data.iloc[:-test_days]
-    test = sku_data.iloc[-test_days:]
+    n = len(sku_data)
+    td = min(test_days, n - 30)  # garantir treino minimo de 30
+    if td < 1:
+        td = max(1, n // 4)
 
-    # Chart overlay
+    train = sku_data.iloc[:-td]
+    test = sku_data.iloc[-td:]
+
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=train["date"].dt.strftime("%Y-%m-%d"), y=train["demand"],
-                              mode="lines", name="Historico",
-                              line=dict(color="#2b2d42", width=1.5)))
-    fig.add_trace(go.Scatter(x=test["date"].dt.strftime("%Y-%m-%d"), y=test["demand"],
-                              mode="lines", name="Real (Teste)",
-                              line=dict(color="#1a1a2e", width=2, dash="dot")))
+    if not train.empty:
+        fig.add_trace(go.Scatter(
+            x=_dates_to_str(train["date"]), y=train["demand"].tolist(),
+            mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
+    if not test.empty:
+        fig.add_trace(go.Scatter(
+            x=_dates_to_str(test["date"]), y=test["demand"].tolist(),
+            mode="lines", name="Real (Teste)", line=dict(color="#1a1a2e", width=2, dash="dot")))
 
     metrics_rows = []
     detail_charts = {}
+
     for mname, res in results.items():
-        if res["forecast"] is not None:
+        if res.get("forecast") is not None:
             fc = res["forecast"]
             color = MODEL_COLORS.get(mname, "#4361ee")
-            fig.add_trace(go.Scatter(x=fc["ds"].dt.strftime("%Y-%m-%d"), y=fc["yhat"],
-                                      mode="lines", name=mname, line=dict(color=color, width=2.5)))
-            fig.add_trace(go.Scatter(
-                x=list(fc["ds"].dt.strftime("%Y-%m-%d")) + list(fc["ds"].dt.strftime("%Y-%m-%d"))[::-1],
-                y=list(fc["yhat_upper"]) + list(fc["yhat_lower"])[::-1],
-                fill="toself", fillcolor=f"{color}10", line=dict(color="rgba(0,0,0,0)"),
-                showlegend=False))
+            ds_str = _dates_to_str(fc["ds"])
+            yhat = fc["yhat"].tolist()
 
-        if res["metrics"]:
-            metrics_rows.append({"Model": mname, **res["metrics"]})
+            fig.add_trace(go.Scatter(x=ds_str, y=yhat, mode="lines", name=mname,
+                                      line=dict(color=color, width=2.5)))
 
-        # Chart individual
-        if res["forecast"] is not None:
-            fc = res["forecast"]
+            if "yhat_upper" in fc.columns and "yhat_lower" in fc.columns:
+                fig.add_trace(go.Scatter(
+                    x=ds_str + ds_str[::-1],
+                    y=fc["yhat_upper"].tolist() + fc["yhat_lower"].tolist()[::-1],
+                    fill="toself", fillcolor=_hex_to_rgba(color, 0.07),
+                    line=dict(color="rgba(0,0,0,0)"), showlegend=False))
+
+            # Chart individual
             figi = go.Figure()
-            figi.add_trace(go.Scatter(x=train["date"].dt.strftime("%Y-%m-%d"), y=train["demand"],
-                                       mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
-            figi.add_trace(go.Scatter(x=test["date"].dt.strftime("%Y-%m-%d"), y=test["demand"],
-                                       mode="lines", name="Real", line=dict(color="#1a1a2e", width=2, dash="dot")))
-            c = MODEL_COLORS.get(mname, "#4361ee")
-            figi.add_trace(go.Scatter(x=fc["ds"].dt.strftime("%Y-%m-%d"), y=fc["yhat"],
-                                       mode="lines", name=mname, line=dict(color=c, width=2.5)))
-            figi.add_trace(go.Scatter(
-                x=list(fc["ds"].dt.strftime("%Y-%m-%d")) + list(fc["ds"].dt.strftime("%Y-%m-%d"))[::-1],
-                y=list(fc["yhat_upper"]) + list(fc["yhat_lower"])[::-1],
-                fill="toself", fillcolor=f"{c}15", line=dict(color="rgba(0,0,0,0)"), showlegend=False))
+            if not train.empty:
+                figi.add_trace(go.Scatter(
+                    x=_dates_to_str(train["date"]), y=train["demand"].tolist(),
+                    mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
+            if not test.empty:
+                figi.add_trace(go.Scatter(
+                    x=_dates_to_str(test["date"]), y=test["demand"].tolist(),
+                    mode="lines", name="Real", line=dict(color="#1a1a2e", width=2, dash="dot")))
+            figi.add_trace(go.Scatter(x=ds_str, y=yhat, mode="lines", name=mname,
+                                       line=dict(color=color, width=2.5)))
+            if "yhat_upper" in fc.columns and "yhat_lower" in fc.columns:
+                figi.add_trace(go.Scatter(
+                    x=ds_str + ds_str[::-1],
+                    y=fc["yhat_upper"].tolist() + fc["yhat_lower"].tolist()[::-1],
+                    fill="toself", fillcolor=_hex_to_rgba(color, 0.1),
+                    line=dict(color="rgba(0,0,0,0)"), showlegend=False))
             figi.update_layout(**base_layout(mname, 360))
             detail_charts[mname] = fig_to_json(figi)
+
+        if res.get("metrics"):
+            metrics_rows.append({"Model": mname, **res["metrics"]})
 
     fig.update_layout(**base_layout("Comparacao de Forecasts", 500))
 
@@ -449,74 +535,126 @@ def api_forecast_individual():
     if metrics_rows:
         mdf = pd.DataFrame(metrics_rows)
         fig_wape = go.Figure(go.Bar(
-            x=mdf["Model"], y=mdf["WAPE"],
+            x=mdf["Model"].tolist(), y=mdf["WAPE"].tolist(),
             marker=dict(color=[MODEL_COLORS.get(m, "#4361ee") for m in mdf["Model"]]),
-            text=mdf["WAPE"].round(1), textposition="outside"))
+            text=[round(float(w), 1) for w in mdf["WAPE"]], textposition="outside"))
         fig_wape.update_layout(**base_layout("WAPE por Modelo (%)", 360))
     else:
         fig_wape = go.Figure()
+        fig_wape.update_layout(**base_layout("Sem resultados", 360))
 
-    return jsonify({
-        "overlay_chart": fig_to_json(fig),
-        "wape_chart": fig_to_json(fig_wape),
-        "detail_charts": detail_charts,
-        "metrics": metrics_rows,
-        "params": {m: r["params"] for m, r in results.items()},
-        "errors": {m: r["error"] for m, r in results.items() if r["error"]},
-    })
+    return fig, fig_wape, detail_charts, metrics_rows
+
+
+# ===================================================================
+# API - FORECASTING
+# ===================================================================
+@app.route("/api/forecast/individual", methods=["POST"])
+def api_forecast_individual():
+    try:
+        df = get_data()
+        body = request.get_json(silent=True) or {}
+        sku_id = body.get("sku_id")
+        models = body.get("models", ["XGBoost", "LightGBM", "AutoARIMA"])
+        horizon = body.get("horizon", 30)
+        test_days = body.get("test_days", 60)
+
+        if not sku_id:
+            return jsonify({"error": "sku_id obrigatorio"}), 400
+
+        sku_data = df[df["sku_id"] == sku_id]
+        if sku_data.empty:
+            return jsonify({"error": f"SKU '{sku_id}' nao encontrado"}), 404
+
+        results = run_forecast_pipeline(df, sku_id, models, test_days, horizon)
+
+        fig, fig_wape, detail_charts, metrics_rows = _build_forecast_overlay(
+            df, sku_id, results, test_days)
+
+        return safe_jsonify({
+            "overlay_chart": fig_to_json(fig),
+            "wape_chart": fig_to_json(fig_wape),
+            "detail_charts": detail_charts,
+            "metrics": metrics_rows,
+            "params": {m: r.get("params", {}) for m, r in results.items()},
+            "errors": {m: r["error"] for m, r in results.items() if r.get("error")},
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/forecast/aggregated", methods=["POST"])
 def api_forecast_aggregated():
-    df = get_data()
-    body = request.get_json(silent=True) or {}
-    models = body.get("models", ["XGBoost", "LightGBM", "AutoARIMA"])
-    horizon = body.get("horizon", 30)
-    test_days = body.get("test_days", 60)
-    metric = body.get("metric", "pearson")
-    weight_method = body.get("weight_method", "rolling")
+    try:
+        df = get_data()
+        body = request.get_json(silent=True) or {}
+        models = body.get("models", ["XGBoost", "LightGBM", "AutoARIMA"])
+        horizon = body.get("horizon", 30)
+        test_days = body.get("test_days", 60)
+        metric = body.get("metric", "pearson")
+        weight_method = body.get("weight_method", "rolling")
 
-    cluster_info = run_cluster_analysis(df, metric=metric)
-    results = run_cluster_forecast_pipeline(df, cluster_info, models,
-                                            test_days=test_days, horizon=horizon,
-                                            weight_method=weight_method)
+        cluster_info = run_cluster_analysis(df, metric=metric)
+        results = run_cluster_forecast_pipeline(df, cluster_info, models,
+                                                test_days=test_days, horizon=horizon,
+                                                weight_method=weight_method)
 
-    cluster_data = aggregate_cluster_demand(df, cluster_info["sku_ids"], cluster_info["labels"])
-    charts = {}
+        cluster_data = aggregate_cluster_demand(df, cluster_info["sku_ids"], cluster_info["labels"])
+        charts = {}
 
-    for cid in sorted(results["cluster_forecasts"].keys()):
-        agg = cluster_data[cid].sort_values("date")
-        tr = agg.iloc[:-test_days]
-        te = agg.iloc[-test_days:]
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=tr["date"].dt.strftime("%Y-%m-%d"), y=tr["demand_agg"],
-                                  mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
-        fig.add_trace(go.Scatter(x=te["date"].dt.strftime("%Y-%m-%d"), y=te["demand_agg"],
-                                  mode="lines", name="Real", line=dict(color="#1a1a2e", width=2, dash="dot")))
-        for mname, fc in results["cluster_forecasts"][cid].items():
-            if fc is not None:
-                c = MODEL_COLORS.get(mname, "#4361ee")
-                fig.add_trace(go.Scatter(x=fc["ds"].dt.strftime("%Y-%m-%d"), y=fc["yhat"],
-                                          mode="lines", name=mname, line=dict(color=c, width=2.5)))
-        fig.update_layout(**base_layout(f"Cluster {cid}", 380))
-        charts[str(cid)] = fig_to_json(fig)
+        for cid in sorted(results["cluster_forecasts"].keys()):
+            agg = cluster_data[cid].sort_values("date")
+            n = len(agg)
+            td = min(test_days, n - 30)
+            if td < 1:
+                td = max(1, n // 4)
 
-    # Pesos + metricas
-    weights_out = {}
-    for cid, w in results["weights"].items():
-        weights_out[str(cid)] = [{"sku": k, "peso": round(v, 4), "pct": round(v*100, 2)} for k, v in w.items()]
+            tr = agg.iloc[:-td]
+            te = agg.iloc[-td:]
+            fig = go.Figure()
+            if not tr.empty:
+                fig.add_trace(go.Scatter(
+                    x=_dates_to_str(tr["date"]), y=tr["demand_agg"].tolist(),
+                    mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
+            if not te.empty:
+                fig.add_trace(go.Scatter(
+                    x=_dates_to_str(te["date"]), y=te["demand_agg"].tolist(),
+                    mode="lines", name="Real", line=dict(color="#1a1a2e", width=2, dash="dot")))
+            for mname, fc in results["cluster_forecasts"][cid].items():
+                if fc is not None:
+                    color = MODEL_COLORS.get(mname, "#4361ee")
+                    fig.add_trace(go.Scatter(
+                        x=_dates_to_str(fc["ds"]), y=fc["yhat"].tolist(),
+                        mode="lines", name=mname, line=dict(color=color, width=2.5)))
+            fig.update_layout(**base_layout(f"Cluster {cid}", 380))
+            charts[str(int(cid))] = fig_to_json(fig)
 
-    metrics_agg = {}
-    for cid, mdata in results["metrics_agg"].items():
-        rows = [{"Model": m, **v} for m, v in mdata.items() if "error" not in v]
-        metrics_agg[str(cid)] = rows
+        # Pesos + metricas
+        weights_out = {}
+        for cid, w in results["weights"].items():
+            weights_out[str(int(cid))] = [
+                {"sku": k, "peso": round(float(v), 4), "pct": round(float(v * 100), 2)}
+                for k, v in w.items()
+            ]
 
-    return jsonify({
-        "charts": charts,
-        "weights": weights_out,
-        "metrics": metrics_agg,
-        "n_clusters": cluster_info["n_clusters"],
-    })
+        metrics_agg = {}
+        for cid, mdata in results["metrics_agg"].items():
+            rows = []
+            for m, v in mdata.items():
+                if "error" not in v:
+                    rows.append({"Model": m, **{k: float(val) if isinstance(val, (np.floating, float)) else val for k, val in v.items()}})
+            metrics_agg[str(int(cid))] = rows
+
+        return safe_jsonify({
+            "charts": charts,
+            "weights": weights_out,
+            "metrics": metrics_agg,
+            "n_clusters": int(cluster_info["n_clusters"]),
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ===================================================================
@@ -524,90 +662,119 @@ def api_forecast_aggregated():
 # ===================================================================
 @app.route("/api/comparison/run", methods=["POST"])
 def api_comparison_run():
-    df = get_data()
-    body = request.get_json(silent=True) or {}
-    models = body.get("models", ["XGBoost", "LightGBM", "AutoARIMA"])
-    horizon = body.get("horizon", 30)
-    test_days = body.get("test_days", 60)
-    sku_ids = body.get("sku_ids") or sorted(df["sku_id"].unique())[:6]
+    try:
+        df = get_data()
+        body = request.get_json(silent=True) or {}
+        models = body.get("models", ["XGBoost", "LightGBM", "AutoARIMA"])
+        horizon = body.get("horizon", 30)
+        test_days = body.get("test_days", 60)
+        sku_ids = body.get("sku_ids") or sorted(df["sku_id"].unique().tolist())[:6]
 
-    all_metrics = []
-    sku_charts = {}
+        all_metrics = []
+        sku_charts = {}
 
-    for sid in sku_ids:
-        res = run_forecast_pipeline(df, sid, models, test_days, horizon)
-        sname = df[df["sku_id"] == sid]["sku_name"].iloc[0]
-        profile = df[df["sku_id"] == sid]["demand_profile"].iloc[0]
+        for sid in sku_ids:
+            sku_check = df[df["sku_id"] == sid]
+            if sku_check.empty:
+                continue
 
-        sku_data = df[df["sku_id"] == sid].sort_values("date")
-        tr = sku_data.iloc[:-test_days]
-        te = sku_data.iloc[-test_days:]
+            sname = str(sku_check["sku_name"].iloc[0])
+            profile = str(sku_check["demand_profile"].iloc[0])
 
+            res = run_forecast_pipeline(df, sid, models, test_days, horizon)
+
+            sku_data = sku_check.sort_values("date")
+            n = len(sku_data)
+            td = min(test_days, n - 30)
+            if td < 1:
+                td = max(1, n // 4)
+
+            tr = sku_data.iloc[:-td]
+            te = sku_data.iloc[-td:]
+
+            fig = go.Figure()
+            if not tr.empty:
+                fig.add_trace(go.Scatter(
+                    x=_dates_to_str(tr["date"]), y=tr["demand"].tolist(),
+                    mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
+            if not te.empty:
+                fig.add_trace(go.Scatter(
+                    x=_dates_to_str(te["date"]), y=te["demand"].tolist(),
+                    mode="lines", name="Real", line=dict(color="#1a1a2e", width=2, dash="dot")))
+
+            for mname, r in res.items():
+                if r.get("metrics"):
+                    row = {"SKU": sid, "Nome": sname, "Perfil": profile, "Model": mname}
+                    for k, v in r["metrics"].items():
+                        row[k] = float(v) if isinstance(v, (np.floating, float, np.integer)) else v
+                    all_metrics.append(row)
+                if r.get("forecast") is not None:
+                    fc = r["forecast"]
+                    color = MODEL_COLORS.get(mname, "#4361ee")
+                    fig.add_trace(go.Scatter(
+                        x=_dates_to_str(fc["ds"]), y=fc["yhat"].tolist(),
+                        mode="lines", name=mname, line=dict(color=color, width=2)))
+            fig.update_layout(**base_layout(sname, 340))
+            sku_charts[sid] = fig_to_json(fig)
+
+        if not all_metrics:
+            return jsonify({"error": "Nenhum resultado obtido. Verifique os modelos selecionados."}), 400
+
+        mdf = pd.DataFrame(all_metrics)
+        charts = {}
+
+        # Radar
+        avg = mdf.groupby("Model")[["MAE", "RMSE", "MAPE", "WAPE"]].mean().round(2).reset_index()
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=tr["date"].dt.strftime("%Y-%m-%d"), y=tr["demand"],
-                                  mode="lines", name="Historico", line=dict(color="#2b2d42", width=1.5)))
-        fig.add_trace(go.Scatter(x=te["date"].dt.strftime("%Y-%m-%d"), y=te["demand"],
-                                  mode="lines", name="Real", line=dict(color="#1a1a2e", width=2, dash="dot")))
+        cols = ["MAE", "RMSE", "MAPE", "WAPE"]
+        for _, row in avg.iterrows():
+            vals = [float(row[c]) for c in cols] + [float(row[cols[0]])]
+            fig.add_trace(go.Scatterpolar(
+                r=vals, theta=cols + [cols[0]], name=str(row["Model"]),
+                fill="toself", fillcolor=_hex_to_rgba(MODEL_COLORS.get(row['Model'], '#4361ee'), 0.1),
+                line=dict(color=MODEL_COLORS.get(row["Model"], "#4361ee"))))
+        fig.update_layout(
+            polar=dict(radialaxis=dict(visible=True, gridcolor="#f1f5f9"),
+                        angularaxis=dict(gridcolor="#f1f5f9"), bgcolor="white"),
+            font=dict(family="Inter", size=12), height=440, paper_bgcolor="white")
+        charts["radar"] = fig_to_json(fig)
 
-        for mname, r in res.items():
-            if r["metrics"]:
-                all_metrics.append({"SKU": sid, "Nome": sname, "Perfil": profile, "Model": mname, **r["metrics"]})
-            if r["forecast"] is not None:
-                fc = r["forecast"]
-                c = MODEL_COLORS.get(mname, "#4361ee")
-                fig.add_trace(go.Scatter(x=fc["ds"].dt.strftime("%Y-%m-%d"), y=fc["yhat"],
-                                          mode="lines", name=mname, line=dict(color=c, width=2)))
-        fig.update_layout(**base_layout(sname, 340))
-        sku_charts[sid] = fig_to_json(fig)
+        # Box WAPE
+        fig = px.box(mdf, x="Model", y="WAPE", color="Model", color_discrete_map=MODEL_COLORS, points="all")
+        fig.update_layout(**base_layout("Distribuicao WAPE", 400), showlegend=False)
+        charts["box_wape"] = fig_to_json(fig)
 
-    if not all_metrics:
-        return jsonify({"error": "Nenhum resultado"}), 400
+        # Grouped bar
+        fig = px.bar(mdf, x="Nome", y="WAPE", color="Model", barmode="group", color_discrete_map=MODEL_COLORS)
+        fig.update_layout(**base_layout("WAPE por SKU", 420))
+        fig.update_xaxes(tickangle=-45)
+        charts["grouped_bar"] = fig_to_json(fig)
 
-    mdf = pd.DataFrame(all_metrics)
-    charts = {}
+        # Best model per SKU
+        best_per = mdf.loc[mdf.groupby("SKU")["WAPE"].idxmin()]
+        bcounts = best_per["Model"].value_counts().reset_index()
+        bcounts.columns = ["Model", "count"]
+        fig = go.Figure(go.Bar(
+            x=bcounts["Model"].tolist(), y=bcounts["count"].tolist(),
+            marker=dict(color=[MODEL_COLORS.get(m, "#4361ee") for m in bcounts["Model"]]),
+            text=bcounts["count"].tolist(), textposition="outside"))
+        fig.update_layout(**base_layout("Vezes Melhor Modelo", 340))
+        charts["best_count"] = fig_to_json(fig)
 
-    # Radar
-    avg = mdf.groupby("Model")[["MAE","RMSE","MAPE","WAPE"]].mean().round(2).reset_index()
-    fig = go.Figure()
-    cols = ["MAE","RMSE","MAPE","WAPE"]
-    for _, row in avg.iterrows():
-        vals = [row[c] for c in cols] + [row[cols[0]]]
-        fig.add_trace(go.Scatterpolar(r=vals, theta=cols+[cols[0]], name=row["Model"],
-                                       fill="toself", fillcolor=f"{MODEL_COLORS.get(row['Model'],'#4361ee')}15",
-                                       line=dict(color=MODEL_COLORS.get(row["Model"], "#4361ee"))))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, gridcolor="#f1f5f9"),
-                                  angularaxis=dict(gridcolor="#f1f5f9"), bgcolor="white"),
-                       font=dict(family="Inter", size=12), height=440, paper_bgcolor="white")
-    charts["radar"] = fig_to_json(fig)
-
-    # Box WAPE
-    fig = px.box(mdf, x="Model", y="WAPE", color="Model", color_discrete_map=MODEL_COLORS, points="all")
-    fig.update_layout(**base_layout("Distribuicao WAPE", 400), showlegend=False)
-    charts["box_wape"] = fig_to_json(fig)
-
-    # Grouped bar
-    fig = px.bar(mdf, x="Nome", y="WAPE", color="Model", barmode="group", color_discrete_map=MODEL_COLORS)
-    fig.update_layout(**base_layout("WAPE por SKU", 420), xaxis=dict(tickangle=-45))
-    charts["grouped_bar"] = fig_to_json(fig)
-
-    # Best model per SKU
-    best_per = mdf.loc[mdf.groupby("SKU")["WAPE"].idxmin()]
-    bcounts = best_per["Model"].value_counts().reset_index()
-    bcounts.columns = ["Model", "count"]
-    fig = go.Figure(go.Bar(x=bcounts["Model"], y=bcounts["count"],
-                           marker=dict(color=[MODEL_COLORS.get(m,"#4361ee") for m in bcounts["Model"]]),
-                           text=bcounts["count"], textposition="outside"))
-    fig.update_layout(**base_layout("Vezes Melhor Modelo", 340))
-    charts["best_count"] = fig_to_json(fig)
-
-    return jsonify({
-        "metrics": all_metrics,
-        "avg": avg.to_dict(orient="records"),
-        "charts": charts,
-        "sku_charts": sku_charts,
-    })
+        return safe_jsonify({
+            "metrics": all_metrics,
+            "avg": json.loads(avg.to_json(orient="records")),
+            "charts": charts,
+            "sku_charts": sku_charts,
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ===================================================================
 if __name__ == "__main__":
+    print("Gerando dados sinteticos...")
+    get_data()
+    print("Dados prontos. Iniciando servidor em http://localhost:5000")
     app.run(debug=True, port=5000)

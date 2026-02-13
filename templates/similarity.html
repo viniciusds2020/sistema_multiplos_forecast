@@ -97,6 +97,13 @@ async function runClustering() {
     simData = await postJson('/api/similarity/run', { metric, auto_k: autoK, manual_k: manualK });
 
     document.getElementById('sim-loading').classList.add('hidden');
+
+    if (!simData || simData.error) {
+        document.getElementById('sim-kpis').innerHTML = '';
+        showError('sim-kpis', simData?.error || 'Erro ao executar clustering');
+        return;
+    }
+
     document.getElementById('sim-results').classList.remove('hidden');
 
     // KPIs
@@ -106,16 +113,18 @@ async function runClustering() {
         ${kpiHtml('Total SKUs', simData.total_skus, '#118ab2')}
     `;
 
-    renderPlotly('chart-dist', simData.charts.dist_heatmap);
-    renderPlotly('chart-sil', simData.charts.silhouette);
-    renderPlotly('chart-mds', simData.charts.mds);
-    renderPlotly('chart-dendro', simData.charts.dendro);
+    if (simData.charts) {
+        renderPlotly('chart-dist', simData.charts.dist_heatmap);
+        renderPlotly('chart-sil', simData.charts.silhouette);
+        renderPlotly('chart-mds', simData.charts.mds);
+        renderPlotly('chart-dendro', simData.charts.dendro);
+    }
 
     // Populate cluster selector
     const sel = document.getElementById('sel-cluster');
-    sel.innerHTML = Object.keys(simData.charts.cluster_series)
-        .map(c => `<option value="${c}">Cluster ${c}</option>`).join('');
-    showClusterDetail();
+    const clusterKeys = simData.charts?.cluster_series ? Object.keys(simData.charts.cluster_series) : [];
+    sel.innerHTML = clusterKeys.map(c => `<option value="${c}">Cluster ${c}</option>`).join('');
+    if (clusterKeys.length) showClusterDetail();
 }
 
 function showClusterDetail() {

@@ -95,7 +95,14 @@ def run_forecast_pipeline(
     df_sku = prepare_ml_features(df_sku)
     feature_cols = get_feature_columns()
 
-    train_df, test_df = split_train_test(df_sku, test_days)
+    n = len(df_sku)
+    if n < 60:
+        return {m: {"model_name": m, "forecast": None, "metrics": None, "params": {},
+                     "error": f"Dados insuficientes ({n} registros, minimo 60)"} for m in model_names}
+
+    # Garantir que test_days nao ultrapasse os dados
+    safe_test_days = min(test_days, n - 30)
+    train_df, test_df = split_train_test(df_sku, safe_test_days)
 
     results = {}
     for model_name in model_names:

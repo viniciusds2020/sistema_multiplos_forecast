@@ -48,15 +48,18 @@
 document.addEventListener('DOMContentLoaded', async () => {
     // KPIs
     const kpis = await fetchJson('/api/kpis');
-    document.getElementById('kpis').innerHTML = `
-        ${kpiHtml('Total SKUs', kpis.total_skus, '#4361ee')}
-        ${kpiHtml('Registros', kpis.total_records.toLocaleString(), '#06d6a0')}
-        ${kpiHtml('Cobertura', kpis.coverage_days + ' dias', '#118ab2')}
-        ${kpiHtml('Demanda Media', kpis.avg_demand + ' un/dia', '#ffd166')}
-    `;
+    if (kpis && !kpis.error) {
+        document.getElementById('kpis').innerHTML = `
+            ${kpiHtml('Total SKUs', kpis.total_skus, '#4361ee')}
+            ${kpiHtml('Registros', kpis.total_records.toLocaleString(), '#06d6a0')}
+            ${kpiHtml('Cobertura', kpis.coverage_days + ' dias', '#118ab2')}
+            ${kpiHtml('Demanda Media', kpis.avg_demand + ' un/dia', '#ffd166')}
+        `;
+    }
 
     // Charts
     const data = await fetchJson('/api/overview/charts');
+    if (!data || data.error) { showError('chart-heatmap', data?.error || 'Erro ao carregar'); return; }
     renderPlotly('chart-heatmap', data.heatmap);
     renderPlotly('chart-top', data.top_skus);
     renderPlotly('chart-total', data.total_demand);
