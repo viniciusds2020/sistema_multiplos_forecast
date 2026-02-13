@@ -133,9 +133,18 @@
             </div>`;
         }
 
-        async function fetchJson(url, opts) {
+        async function fetchJson(url, opts, timeoutMs) {
             try {
-                const res = await fetch(url, opts);
+                let fetchOpts = {...(opts || {})};
+                // Timeout via AbortController (default 5min para modelos)
+                const ms = timeoutMs || (fetchOpts.method === 'POST' ? 300000 : 30000);
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), ms);
+                fetchOpts.signal = ctrl.signal;
+
+                const res = await fetch(url, fetchOpts);
+                clearTimeout(timer);
+
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
                     console.error('API error:', res.status, err.error || res.statusText);
@@ -143,8 +152,12 @@
                 }
                 return await res.json();
             } catch(e) {
+                if (e.name === 'AbortError') {
+                    console.error('Request timeout:', url);
+                    return {error: 'Timeout - operacao demorou demais. Tente com menos modelos.'};
+                }
                 console.error('Fetch error:', e);
-                return {error: e.message};
+                return {error: 'Erro de conexao com o servidor. Verifique se o servidor esta rodando.'};
             }
         }
 

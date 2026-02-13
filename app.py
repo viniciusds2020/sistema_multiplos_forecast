@@ -49,7 +49,25 @@ class NumpyEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-app.json_encoder = NumpyEncoder
+# Flask 3.x JSON provider customizado
+from flask.json.provider import DefaultJSONProvider
+
+class NumpyJSONProvider(DefaultJSONProvider):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, pd.Timestamp):
+            return obj.strftime("%Y-%m-%d")
+        return super().default(obj)
+
+app.json_provider_class = NumpyJSONProvider
+app.json = NumpyJSONProvider(app)
 
 
 def safe_jsonify(data):
@@ -137,6 +155,16 @@ def page_comparison():
 # ===================================================================
 # API - DADOS GERAIS
 # ===================================================================
+@app.route("/api/models")
+def api_models():
+    """Retorna lista de modelos disponiveis (que podem ser importados)."""
+    from models.model_registry import list_models, list_available_models
+    return safe_jsonify({
+        "all": list_models(),
+        "available": list_available_models(),
+    })
+
+
 @app.route("/api/kpis")
 def api_kpis():
     df = get_data()
@@ -777,4 +805,4 @@ if __name__ == "__main__":
     print("Gerando dados sinteticos...")
     get_data()
     print("Dados prontos. Iniciando servidor em http://localhost:5000")
-    app.run(debug=True, port=5000)
+    app.run(debug=False, host="0.0.0.0", port=5000, threaded=True)

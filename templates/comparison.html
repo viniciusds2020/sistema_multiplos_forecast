@@ -89,7 +89,8 @@
 
 {% block scripts %}
 <script>
-const CMP_MODELS = ['XGBoost','LightGBM','AutoARIMA','Prophet','CrostonSBA'];
+let CMP_MODELS = ['XGBoost','LightGBM','AutoARIMA','Prophet','CrostonSBA'];
+let CMP_AVAILABLE = [];
 const MC = {'XGBoost':'#4361ee','LightGBM':'#06d6a0','AutoARIMA':'#ef476f','Prophet':'#ffd166','CrostonSBA':'#7209b7'};
 let cmpData = null;
 let allSkuList = [];
@@ -180,12 +181,23 @@ function showSkuChart() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Carregar modelos disponiveis
+    const modelsInfo = await fetchJson('/api/models');
+    if (modelsInfo && !modelsInfo.error) {
+        CMP_MODELS = modelsInfo.all || CMP_MODELS;
+        CMP_AVAILABLE = modelsInfo.available || CMP_MODELS;
+    } else {
+        CMP_AVAILABLE = CMP_MODELS;
+    }
+
     // Model checks
-    document.getElementById('cmp-model-checks').innerHTML = CMP_MODELS.map((m,i) => `
-        <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-            <input type="checkbox" id="cmp-${m}" ${i<3?'checked':''} class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"> ${m}
-        </label>
-    `).join('');
+    document.getElementById('cmp-model-checks').innerHTML = CMP_MODELS.map((m,i) => {
+        const avail = CMP_AVAILABLE.includes(m);
+        return `<label class="flex items-center gap-1.5 text-xs font-medium ${avail ? 'text-gray-600' : 'text-gray-300 line-through'}">
+            <input type="checkbox" id="cmp-${m}" ${avail && i<3?'checked':''} ${!avail?'disabled':''}
+                   class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"> ${m}${!avail ? ' (indisponivel)' : ''}
+        </label>`;
+    }).join('');
 
     // SKU checks
     allSkuList = await fetchJson('/api/skus');

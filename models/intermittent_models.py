@@ -41,11 +41,16 @@ class CrostonSBAForecaster(BaseForecaster):
         yhat = np.maximum(0, yhat)
 
         # Croston produz forecasts planos - estimar intervalos via residuos
-        fitted = self.model.fitted_[0]["CrostonSBA"].values if hasattr(self.model, 'fitted_') else None
-        if fitted is not None:
-            residual_std = np.std(self._last_y.values[-len(fitted):] - fitted)
-        else:
-            residual_std = np.std(self._last_y.values) * 0.5
+        residual_std = np.std(self._last_y.values) * 0.5
+        try:
+            if hasattr(self.model, 'fitted_') and self.model.fitted_ is not None:
+                fitted_df = self.model.fitted_[0] if isinstance(self.model.fitted_, list) else self.model.fitted_
+                if "CrostonSBA" in fitted_df.columns:
+                    fitted = fitted_df["CrostonSBA"].values
+                    y_vals = self._last_y.values[-len(fitted):]
+                    residual_std = float(np.std(y_vals - fitted))
+        except Exception:
+            pass
 
         future_dates = pd.date_range(
             start=self._last_y.index[-1] + pd.Timedelta(days=1),

@@ -117,7 +117,8 @@
 
 {% block scripts %}
 <script>
-const MODELS = ['XGBoost','LightGBM','AutoARIMA','Prophet','CrostonSBA'];
+let MODELS = ['XGBoost','LightGBM','AutoARIMA','Prophet','CrostonSBA'];
+let AVAILABLE_MODELS = [];
 const MODEL_COLORS = {'XGBoost':'#4361ee','LightGBM':'#06d6a0','AutoARIMA':'#ef476f','Prophet':'#ffd166','Chronos':'#118ab2','CrostonSBA':'#7209b7'};
 
 function switchMode(mode) {
@@ -132,11 +133,13 @@ function getSelectedModels(prefix) {
 
 function renderModelChecks(containerId, prefix) {
     const el = document.getElementById(containerId);
-    el.innerHTML = MODELS.map((m,i) => `
-        <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-            <input type="checkbox" id="${prefix}-${m}" ${i < 3 ? 'checked' : ''} class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"> ${m}
-        </label>
-    `).join('');
+    el.innerHTML = MODELS.map((m,i) => {
+        const avail = AVAILABLE_MODELS.includes(m);
+        return `<label class="flex items-center gap-1.5 text-xs font-medium ${avail ? 'text-gray-600' : 'text-gray-300 line-through'}">
+            <input type="checkbox" id="${prefix}-${m}" ${avail && i < 3 ? 'checked' : ''} ${!avail ? 'disabled' : ''}
+                   class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"> ${m}${!avail ? ' (indisponivel)' : ''}
+        </label>`;
+    }).join('');
 }
 
 async function runIndividual() {
@@ -278,6 +281,15 @@ async function runAggregated() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Carregar modelos disponiveis
+    const modelsInfo = await fetchJson('/api/models');
+    if (modelsInfo && !modelsInfo.error) {
+        MODELS = modelsInfo.all || MODELS;
+        AVAILABLE_MODELS = modelsInfo.available || MODELS;
+    } else {
+        AVAILABLE_MODELS = MODELS;
+    }
+
     renderModelChecks('model-checks', 'mdl');
     renderModelChecks('agg-model-checks', 'amdl');
 
