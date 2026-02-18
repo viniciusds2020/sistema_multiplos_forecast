@@ -20,6 +20,7 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # Data
 *.csv
@@ -34,6 +35,10 @@ Thumbs.db
 
 # Streamlit
 .streamlit/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
 
 # Env
 .env

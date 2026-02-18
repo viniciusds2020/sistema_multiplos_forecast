@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #4361ee;
+  --color-brand-600: #3a0ca3;
+  --color-brand-700: #312e81;
+  --color-brand-800: #1e1b4b;
+  --color-brand-900: #0f0f23;
+  --color-accent-green: #06d6a0;
+  --color-accent-red: #ef476f;
+  --color-accent-yellow: #ffd166;
+  --color-accent-blue: #118ab2;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+}
+
+/* Card */
+.card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .04), 0 4px 12px rgba(0, 0, 0, .03);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
+}
+
+/* KPI card */
+.kpi-card {
+  border-left: 4px solid var(--kpi-color, #4361ee);
+}
+
+/* Sidebar */
+.sidebar-link {
+  transition: all .2s ease;
+}
+.sidebar-link:hover,
+.sidebar-link.active {
+  background: rgba(255, 255, 255, .1);
+  border-left: 3px solid #818cf8;
+}
+.sidebar-link.active {
+  background: rgba(67, 97, 238, .2);
+}
+
+/* Tab buttons */
+.tab-btn {
+  transition: all .2s ease;
+  cursor: pointer;
+}
+.tab-btn.active {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+  color: #1e1b4b;
+}
+
+/* Plotly modebar auto-hide */
+.plotly-chart .modebar { display: none !important; }
+.plotly-chart:hover .modebar { display: flex !important; }
+
+/* Spinner */
+.spinner {
+  border: 3px solid #e2e8f0;
+  border-top-color: #4361ee;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Fade in */
+.fade-in {
+  animation: fadeIn .4s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }

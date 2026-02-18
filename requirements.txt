@@ -20,8 +20,11 @@ torch>=2.0
 tslearn>=0.6
 scipy>=1.11
 
-# Dashboard
-flask>=3.0
+# API
+fastapi>=0.109
+uvicorn[standard]>=0.27
+pydantic>=2.5
+cachetools>=5.3
 plotly>=5.18
 
 # Utilities
