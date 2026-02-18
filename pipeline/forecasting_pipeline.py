@@ -2,9 +2,19 @@
 
 import pandas as pd
 import numpy as np
-from data.feature_engineering import prepare_ml_features, get_feature_columns
+from data.feature_engineering import (
+    prepare_ml_features,
+    get_ml_feature_columns,
+    get_exogenous_feature_columns,
+)
 from models.model_registry import get_model
 from evaluation.metrics import calculate_all_metrics
+
+
+# Modelos que so devem receber variaveis verdadeiramente exogenas.
+# ARIMA e Prophet ja modelam autocorrelacao internamente — passar lags
+# causa multicolinearidade e piora a performance.
+_EXOGENOUS_ONLY_MODELS = {"AutoARIMA", "Prophet"}
 
 
 def split_train_test(
@@ -21,6 +31,13 @@ def split_train_test(
         test_days = max(1, n - 1)
     split_idx = n - test_days
     return df_sku.iloc[:split_idx].copy(), df_sku.iloc[split_idx:].copy()
+
+
+def _select_feature_cols(model_name: str) -> list[str]:
+    """Retorna o conjunto de features adequado para cada modelo."""
+    if model_name in _EXOGENOUS_ONLY_MODELS:
+        return get_exogenous_feature_columns()
+    return get_ml_feature_columns()
 
 
 def run_single_model(
@@ -46,7 +63,6 @@ def run_single_model(
     try:
         model = get_model(model_name)
 
-        # Preparar series
         if len(test_df) == 0:
             raise ValueError("Conjunto de teste vazio. Ajuste test_days.")
         if horizon > len(test_df):
@@ -61,22 +77,22 @@ def run_single_model(
             index=pd.DatetimeIndex(test_df["date"].values[:horizon]),
         )
 
-        # Preparar features
+        # Seleciona features adequadas ao modelo
         X_train = None
         X_future = None
 
         if model.supports_exogenous and feature_cols:
-            available_cols = [c for c in feature_cols if c in train_df.columns]
-            if available_cols:
-                X_train = train_df[available_cols].reset_index(drop=True)
-                X_future = test_df[available_cols].iloc[:horizon].reset_index(drop=True)
+            cols = _select_feature_cols(model_name)
+            available = [c for c in cols if c in train_df.columns]
+            if available:
+                X_train  = train_df[available].reset_index(drop=True)
+                X_future = test_df[available].iloc[:horizon].reset_index(drop=True)
 
         model.fit(y_train, X_train)
         forecast = model.predict(horizon, X_future)
         result["forecast"] = forecast
-        result["params"] = model.get_params()
+        result["params"]   = model.get_params()
 
-        # Metricas
         y_pred = forecast["yhat"].values[:len(y_test)]
         y_true = y_test.values[:len(y_pred)]
         result["metrics"] = calculate_all_metrics(y_true, y_pred)
@@ -103,16 +119,16 @@ def run_forecast_pipeline(
     if df_sku.empty:
         return {}
 
-    # Feature engineering
     df_sku = prepare_ml_features(df_sku)
-    feature_cols = get_feature_columns()
+    # feature_cols passado apenas como sinalizador — selecao real e feita
+    # em _select_feature_cols() dentro de run_single_model()
+    feature_cols = get_ml_feature_columns()
 
     n = len(df_sku)
     if n < 60:
         return {m: {"model_name": m, "forecast": None, "metrics": None, "params": {},
                      "error": f"Dados insuficientes ({n} registros, minimo 60)"} for m in model_names}
 
-    # Garantir que test_days nao ultrapasse os dados
     safe_test_days = min(test_days, n - 30)
     safe_test_days = max(1, min(safe_test_days, n - 1))
     train_df, test_df = split_train_test(df_sku, safe_test_days)
