@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% set active_page = "comparison" %}
-{% block title %}Comparacao - Forecast Pro{% endblock %}
+{% block title %}Comparação - ForecastForge{% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Comparacao de Modelos</h1>
+    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Comparação de Modelos</h1>
     <p class="text-sm text-gray-400 mt-1">Avalie e compare o desempenho dos modelos em todos os SKUs</p>
     <div class="h-px bg-gradient-to-r from-brand-500/40 to-transparent mt-4 mb-6"></div>
 
@@ -20,7 +20,7 @@
                 <div id="cmp-sku-checks" class="mt-1 flex flex-wrap gap-2 max-w-xl"></div>
             </div>
             <button onclick="runComparison()" class="ml-auto px-5 py-2.5 bg-gradient-to-r from-brand-500 to-brand-600 text-white text-sm font-semibold rounded-lg shadow-md shadow-brand-500/30 hover:shadow-lg hover:-translate-y-0.5 transition-all">
-                Executar Comparacao
+                Executar Comparação
             </button>
         </div>
     </div>
@@ -33,7 +33,7 @@
         <!-- Tabs -->
         <div class="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
             <button onclick="cmpTab('ranking')" class="tab-btn active flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500" data-ctab="ranking">Ranking Geral</button>
-            <button onclick="cmpTab('visual')" class="tab-btn flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500" data-ctab="visual">Comparacao Visual</button>
+            <button onclick="cmpTab('visual')" class="tab-btn flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500" data-ctab="visual">Comparação Visual</button>
             <button onclick="cmpTab('skus')" class="tab-btn flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500" data-ctab="skus">Por SKU</button>
         </div>
 
@@ -41,7 +41,7 @@
         <div id="ctab-ranking" class="ctab-content">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div class="card p-5">
-                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Media por Modelo</h3>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Média por Modelo</h3>
                     <div id="avg-table" class="overflow-x-auto"></div>
                 </div>
                 <div class="card p-5">
@@ -55,11 +55,11 @@
         <div id="ctab-visual" class="ctab-content hidden">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div class="card p-5">
-                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Radar de Metricas</h3>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Radar de Métricas</h3>
                     <div id="chart-radar" class="plotly-chart"></div>
                 </div>
                 <div class="card p-5">
-                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Distribuicao WAPE</h3>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Distribuição WAPE</h3>
                     <div id="chart-box" class="plotly-chart"></div>
                 </div>
             </div>
@@ -79,7 +79,7 @@
                 <div id="chart-sku-detail" class="plotly-chart"></div>
             </div>
             <div class="card p-5">
-                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Metricas do SKU</h3>
+                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Métricas do SKU</h3>
                 <div id="sku-metrics-table" class="overflow-x-auto"></div>
             </div>
         </div>

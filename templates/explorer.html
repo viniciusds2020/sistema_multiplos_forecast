@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% set active_page = "explorer" %}
-{% block title %}Data Explorer - Forecast Pro{% endblock %}
+{% block title %}Exploração de Dados - ForecastForge{% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Data Explorer</h1>
+    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Exploração de Dados</h1>
     <p class="text-sm text-gray-400 mt-1">Explore as series temporais, dados climaticos e features</p>
     <div class="h-px bg-gradient-to-r from-brand-500/40 to-transparent mt-4 mb-6"></div>
 
@@ -30,7 +30,7 @@
     <!-- Tab contents -->
     <div id="tab-demand" class="tab-content">
         <div class="card p-5">
-            <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Series de Demanda por SKU</h3>
+            <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Séries de Demanda por SKU</h3>
             <div id="chart-demand" class="plotly-chart"></div>
         </div>
     </div>

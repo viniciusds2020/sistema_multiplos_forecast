@@ -1,4 +1,4 @@
-"""Dashboard Flask - Sistema de Forecast Multi-Produto SKU."""
+"""Dashboard Flask - Sistema de Forecast Multi-Produto SKU. ForecastForge"""
 
 import sys
 import json
@@ -80,11 +80,18 @@ def safe_jsonify(data):
 # Cache global de dados
 # ---------------------------------------------------------------------------
 _cache: dict = {}
+_cache_lock = None
 
 
 def get_data() -> pd.DataFrame:
+    global _cache_lock
+    if _cache_lock is None:
+        import threading
+        _cache_lock = threading.Lock()
     if "df" not in _cache:
-        _cache["df"] = generate_synthetic_data()
+        with _cache_lock:
+            if "df" not in _cache:
+                _cache["df"] = generate_synthetic_data()
     return _cache["df"]
 
 
@@ -423,15 +430,17 @@ def api_similarity_run():
 
         # MDS 2D scatter
         cl_colors = px.colors.qualitative.Set2[:n_clusters]
+        labels_min = int(np.min(labels)) if len(labels) else 0
         fig = go.Figure()
         for c_val in sorted(set(labels)):
             idxs = np.where(labels == c_val)[0]
+            color_idx = int(c_val) - 1 if labels_min == 1 else int(c_val)
             fig.add_trace(go.Scatter(
                 x=mds[idxs, 0].tolist(), y=mds[idxs, 1].tolist(), mode="markers+text",
                 name=f"Cluster {c_val}",
                 text=[sku_ids[i] for i in idxs], textposition="top center",
                 textfont=dict(size=9),
-                marker=dict(size=12, color=cl_colors[int(c_val) - 1] if int(c_val) <= len(cl_colors) else "#4361ee")))
+                marker=dict(size=12, color=cl_colors[color_idx] if 0 <= color_idx < len(cl_colors) else "#4361ee")))
         fig.update_layout(**base_layout("", 460), xaxis_title="MDS 1", yaxis_title="MDS 2")
         charts["mds"] = fig_to_json(fig)
 
@@ -779,7 +788,10 @@ def api_comparison_run():
         charts["grouped_bar"] = fig_to_json(fig)
 
         # Best model per SKU
-        best_per = mdf.loc[mdf.groupby("SKU")["WAPE"].idxmin()]
+        mdf_wape = mdf[mdf["WAPE"].notna()].copy()
+        if mdf_wape.empty:
+            return jsonify({"error": "Nenhum WAPE valido para comparar."}), 400
+        best_per = mdf_wape.loc[mdf_wape.groupby("SKU")["WAPE"].idxmin()]
         bcounts = best_per["Model"].value_counts().reset_index()
         bcounts.columns = ["Model", "count"]
         fig = go.Figure(go.Bar(

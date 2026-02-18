@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% set active_page = "similarity" %}
-{% block title %}Similaridade - Forecast Pro{% endblock %}
+{% block title %}Similaridade - ForecastForge{% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Analise de Similaridade</h1>
+    <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Análise de Similaridade</h1>
     <p class="text-sm text-gray-400 mt-1">Identifique padroes semelhantes entre SKUs e agrupe-os em clusters</p>
     <div class="h-px bg-gradient-to-r from-brand-500/40 to-transparent mt-4 mb-6"></div>
 
@@ -39,7 +39,7 @@
     <div id="sim-results" class="hidden">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div class="card p-5">
-                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Matriz de Distancia</h3>
+                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Matriz de Distância</h3>
                 <div id="chart-dist" class="plotly-chart"></div>
             </div>
             <div class="card p-5">
@@ -51,11 +51,11 @@
         <!-- Row 2: MDS + Dendrograma -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div class="card p-5">
-                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Projecao MDS 2D</h3>
+                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Projeção MDS 2D</h3>
                 <div id="chart-mds" class="plotly-chart"></div>
             </div>
             <div class="card p-5">
-                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Dendrograma Hierarquico</h3>
+                <h3 class="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Dendrograma Hierárquico</h3>
                 <div id="chart-dendro" class="plotly-chart"></div>
             </div>
         </div>

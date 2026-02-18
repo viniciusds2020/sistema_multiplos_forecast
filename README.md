@@ -1,6 +1,6 @@
 # Sistema de Forecast Multi-Produto SKU
 
-Sistema completo de forecasting para multiplos produtos (SKUs) com analise de similaridade entre series temporais, modelos agregados por cluster e rateio proporcional por produto. Dashboard interativo com Streamlit.
+Sistema completo de forecasting para multiplos produtos (SKUs) com analise de similaridade entre series temporais, modelos agregados por cluster e rateio proporcional por produto. Dashboard interativo com Flask.
 
 ---
 
@@ -8,47 +8,39 @@ Sistema completo de forecasting para multiplos produtos (SKUs) com analise de si
 
 ```
 sistema_multiplos_forecast/
-│
-├── app.py                          # Entry point do dashboard Streamlit
-├── sistema_forecast.py             # Orquestrador principal (CLI demo)
-├── config.py                       # Configuracoes globais e paleta de cores
-├── requirements.txt                # Dependencias Python
-│
-├── data/
-│   ├── synthetic_generator.py      # Geracao de dados sinteticos (20 SKUs, 2.5 anos)
-│   └── feature_engineering.py      # Lags, rolling stats, encoding de features
-│
-├── models/
-│   ├── base_model.py               # Interface abstrata BaseForecaster
-│   ├── ml_models.py                # XGBoost e LightGBM
-│   ├── arima_model.py              # Auto ARIMA (pmdarima)
-│   ├── prophet_model.py            # Prophet (Meta)
-│   ├── chronos_model.py            # Chronos-Bolt (Amazon Foundation Model)
-│   ├── intermittent_models.py      # Croston SBA (statsforecast)
-│   └── model_registry.py           # Registry para instanciar modelos por nome
-│
-├── similarity/
-│   ├── clustering.py               # DTW, Pearson, Euclidean + TimeSeriesKMeans
-│   └── aggregation.py              # Agregacao por cluster + rateio proporcional
-│
-├── evaluation/
-│   └── metrics.py                  # MAE, RMSE, MAPE, WAPE, Bias
-│
-├── pipeline/
-│   ├── forecasting_pipeline.py     # Pipeline de forecast individual por SKU
-│   └── cluster_pipeline.py         # Pipeline agregado: cluster -> forecast -> rateio
-│
-└── dashboard/
-    ├── styles.py                   # CSS customizado (design React-like)
-    ├── components.py               # KPI cards, charts, layouts reutilizaveis
-    ├── page_overview.py            # Pagina 1: Dashboard geral com KPIs
-    ├── page_data_explorer.py       # Pagina 2: Exploracao de dados e features
-    ├── page_similarity.py          # Pagina 3: Similaridade e clustering
-    ├── page_forecasting.py         # Pagina 4: Treinar modelos e gerar previsoes
-    └── page_model_comparison.py    # Pagina 5: Comparacao e avaliacao de modelos
+|
+|-- app.py                          # Entry point do dashboard Flask
+|-- sistema_forecast.py             # Orquestrador principal (CLI demo)
+|-- config.py                       # Configuracoes globais e paleta de cores
+|-- requirements.txt                # Dependencias Python
+|
+|-- data/
+|   |-- synthetic_generator.py      # Geracao de dados sinteticos (20 SKUs, 2.5 anos)
+|   `-- feature_engineering.py      # Lags, rolling stats, encoding de features
+|
+|-- models/
+|   |-- base_model.py               # Interface abstrata BaseForecaster
+|   |-- ml_models.py                # XGBoost e LightGBM
+|   |-- arima_model.py              # Auto ARIMA (pmdarima)
+|   |-- prophet_model.py            # Prophet (Meta)
+|   |-- chronos_model.py            # Chronos-Bolt (Amazon Foundation Model)
+|   |-- intermittent_models.py      # Croston SBA (statsforecast)
+|   `-- model_registry.py           # Registry para instanciar modelos por nome
+|
+|-- similarity/
+|   |-- clustering.py               # DTW, Pearson, Euclidean + TimeSeriesKMeans
+|   `-- aggregation.py              # Agregacao por cluster + rateio proporcional
+|
+|-- evaluation/
+|   `-- metrics.py                  # MAE, RMSE, MAPE, WAPE, Bias
+|
+|-- pipeline/
+|   |-- forecasting_pipeline.py     # Pipeline de forecast individual por SKU
+|   `-- cluster_pipeline.py         # Pipeline agregado: cluster -> forecast -> rateio
+|
+|-- templates/                      # Views HTML (Flask)
+`-- static/                         # Assets (CSS/JS)
 ```
-
----
 
 ## Funcionalidades
 
@@ -102,10 +94,10 @@ Todos os modelos implementam a interface `BaseForecaster` com metodos `fit()`, `
 
 | Pagina | Descricao |
 |--------|-----------|
-| **Overview** | KPIs (total SKUs, registros, cobertura, demanda media), heatmap SKU x mes, top 10 SKUs, demanda total agregada, distribuicao por perfil |
-| **Data Explorer** | Series de demanda por SKU, dados climaticos (temperatura, chuva, umidade), distribuicoes por estacao/dia/safra/perfil, tabela com download CSV |
+| **Visao Geral** | KPIs (total SKUs, registros, cobertura, demanda media), heatmap SKU x mes, top 10 SKUs, demanda total agregada, distribuicao por perfil |
+| **Exploracao de Dados** | Series de demanda por SKU, dados climaticos (temperatura, chuva, umidade), distribuicoes por estacao/dia/safra/perfil, tabela com download CSV |
 | **Similaridade** | Matriz de distancia, silhouette score por k, projecao MDS 2D colorida por cluster, dendrograma, detalhe de series por cluster |
-| **Forecasting** | Modo individual (por SKU) ou agregado (por cluster), selecao de modelos, grafico de forecast com intervalos de confianca, rateio por SKU, pesos de rateio |
+| **Previsao** | Modo individual (por SKU) ou agregado (por cluster), selecao de modelos, grafico de forecast com intervalos de confianca, rateio por SKU, pesos de rateio |
 | **Comparacao** | Ranking geral, melhor modelo por metrica e por SKU, radar chart multi-metrica, box plots, graficos agrupados, analise de residuos com ACF |
 
 ---

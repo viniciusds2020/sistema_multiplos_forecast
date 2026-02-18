@@ -8,10 +8,10 @@ Orquestrador principal que integra:
 - Analise de similaridade (DTW, Pearson, Euclidean)
 - Clustering de series temporais
 - Forecast agregado por cluster com rateio proporcional
-- Dashboard interativo (Streamlit)
+- Dashboard interativo (Flask)
 
 Uso:
-    streamlit run app.py
+    python app.py
 """
 
 import sys
@@ -22,18 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import pandas as pd
 import numpy as np
 from data.synthetic_generator import generate_synthetic_data
-from data.feature_engineering import prepare_ml_features, get_feature_columns
-from models.model_registry import get_model, list_models
-from evaluation.metrics import calculate_all_metrics, evaluate_forecasts
-from similarity.clustering import (
-    build_demand_matrix, compute_distance_matrix,
-    find_optimal_clusters, cluster_series, get_cluster_summary,
-)
-from similarity.aggregation import (
-    aggregate_cluster_demand, compute_disaggregation_weights,
-    disaggregate_forecast,
-)
-from pipeline.forecasting_pipeline import run_forecast_pipeline, run_all_skus_pipeline
+from models.model_registry import list_models
+from pipeline.forecasting_pipeline import run_forecast_pipeline
 from pipeline.cluster_pipeline import run_cluster_analysis, run_cluster_forecast_pipeline
 
 
@@ -54,14 +44,17 @@ def run_demo():
     print("\n[2/6] Executando analise de similaridade...")
     cluster_info = run_cluster_analysis(df, metric="pearson")
     n_clusters = cluster_info["n_clusters"]
+    labels = cluster_info["labels"]
+    labels_min = int(np.min(labels)) if len(labels) else 0
     print(f"  -> Clusters encontrados: {n_clusters}")
     print(f"  -> Silhouette scores: {cluster_info['silhouette_scores']}")
 
     # Mostrar composicao dos clusters
-    for c in range(1, n_clusters + 1):
-        mask = cluster_info["labels"] == c
+    for c in range(n_clusters):
+        label_val = c + 1 if labels_min == 1 else c
+        mask = labels == label_val
         skus = [cluster_info["sku_ids"][i] for i in np.where(mask)[0]]
-        print(f"  -> Cluster {c}: {skus}")
+        print(f"  -> Cluster {label_val}: {skus}")
 
     # 3. Forecast individual (amostra)
     print("\n[3/6] Executando forecast individual (3 SKUs de amostra)...")
@@ -75,7 +68,9 @@ def run_demo():
             if res["metrics"]:
                 wape = res["metrics"].get("WAPE", "N/A")
                 mae = res["metrics"].get("MAE", "N/A")
-                print(f"    {model_name:15s} | WAPE: {wape:>8} | MAE: {mae:>8}")
+                wape_str = f"{float(wape):.2f}" if isinstance(wape, (int, float, np.floating)) else str(wape)
+                mae_str = f"{float(mae):.2f}" if isinstance(mae, (int, float, np.floating)) else str(mae)
+                print(f"    {model_name:15s} | WAPE: {wape_str:>8} | MAE: {mae_str:>8}")
             elif res["error"]:
                 print(f"    {model_name:15s} | ERRO: {res['error'][:50]}")
 
@@ -90,7 +85,11 @@ def run_demo():
         print(f"\n  Cluster {cluster_id}:")
         for model_name, metrics in cluster_results["metrics_agg"][cluster_id].items():
             if "error" not in metrics:
-                print(f"    {model_name:15s} | WAPE: {metrics.get('WAPE', 'N/A'):>8} | MAE: {metrics.get('MAE', 'N/A'):>8}")
+                wape = metrics.get("WAPE", "N/A")
+                mae = metrics.get("MAE", "N/A")
+                wape_str = f"{float(wape):.2f}" if isinstance(wape, (int, float, np.floating)) else str(wape)
+                mae_str = f"{float(mae):.2f}" if isinstance(mae, (int, float, np.floating)) else str(mae)
+                print(f"    {model_name:15s} | WAPE: {wape_str:>8} | MAE: {mae_str:>8}")
 
     # 5. Pesos de rateio
     print("\n[5/6] Pesos de rateio proporcional:")
@@ -105,7 +104,7 @@ def run_demo():
     print(f"  -> SKUs processados: {df['sku_id'].nunique()}")
     print(f"  -> Clusters: {n_clusters}")
     print(f"\nPara o dashboard interativo, execute:")
-    print(f"  streamlit run app.py")
+    print(f"  python app.py")
     print("=" * 70)
 
 
