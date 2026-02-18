@@ -12,7 +12,14 @@ def split_train_test(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Divide dados de um SKU em treino e teste."""
     df_sku = df_sku.sort_values("date").reset_index(drop=True)
-    split_idx = len(df_sku) - test_days
+    n = len(df_sku)
+    if n == 0:
+        return df_sku.copy(), df_sku.copy()
+    if test_days < 1:
+        test_days = 1
+    if test_days >= n:
+        test_days = max(1, n - 1)
+    split_idx = n - test_days
     return df_sku.iloc[:split_idx].copy(), df_sku.iloc[split_idx:].copy()
 
 
@@ -40,6 +47,11 @@ def run_single_model(
         model = get_model(model_name)
 
         # Preparar series
+        if len(test_df) == 0:
+            raise ValueError("Conjunto de teste vazio. Ajuste test_days.")
+        if horizon > len(test_df):
+            horizon = len(test_df)
+
         y_train = pd.Series(
             train_df["demand"].values,
             index=pd.DatetimeIndex(train_df["date"]),
@@ -102,6 +114,7 @@ def run_forecast_pipeline(
 
     # Garantir que test_days nao ultrapasse os dados
     safe_test_days = min(test_days, n - 30)
+    safe_test_days = max(1, min(safe_test_days, n - 1))
     train_df, test_df = split_train_test(df_sku, safe_test_days)
 
     results = {}
