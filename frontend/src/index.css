@@ -1,57 +1,71 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #4361ee;
-  --color-brand-600: #3a0ca3;
-  --color-brand-700: #312e81;
-  --color-brand-800: #1e1b4b;
-  --color-brand-900: #0f0f23;
-  --color-accent-green: #06d6a0;
-  --color-accent-red: #ef476f;
-  --color-accent-yellow: #ffd166;
-  --color-accent-blue: #118ab2;
+  --font-sans: 'Source Sans 3', system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', 'Times New Roman', serif;
+  --color-brand-50: #fff6ef;
+  --color-brand-100: #ffe7d6;
+  --color-brand-200: #ffd0aa;
+  --color-brand-300: #ffb07a;
+  --color-brand-400: #f7894b;
+  --color-brand-500: #ea6a20;
+  --color-brand-600: #d85b16;
+  --color-brand-700: #b4470f;
+  --color-brand-800: #8c370c;
+  --color-brand-900: #6b2a0a;
+  --color-accent-green: #3a9b62;
+  --color-accent-red: #c4523d;
+  --color-accent-yellow: #e4b24c;
+  --color-accent-blue: #3b6d8c;
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
   margin: 0;
+  background: radial-gradient(circle at top, #fff7f0 0%, #f7f2ec 45%, #f3efe9 100%);
 }
 
 /* Card */
 .card {
-  background: #fff;
-  border-radius: 16px;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .04), 0 4px 12px rgba(0, 0, 0, .03);
+  background: #fffdfa;
+  border-radius: 20px;
+  border: 1px solid #f0e4d7;
+  box-shadow: 0 10px 24px rgba(88, 48, 18, .08), 0 2px 6px rgba(88, 48, 18, .05);
   transition: transform .2s ease, box-shadow .2s ease;
 }
 .card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(88, 48, 18, .12), 0 4px 10px rgba(88, 48, 18, .08);
 }
 
 /* KPI card */
 .kpi-card {
-  border-left: 4px solid var(--kpi-color, #4361ee);
+  border-left: 4px solid var(--kpi-color, #ea6a20);
 }
 
-/* Sidebar */
-.sidebar-link {
+/* Navigation */
+.nav-link {
   transition: all .2s ease;
+  text-transform: uppercase;
+  letter-spacing: .12em;
 }
-.sidebar-link:hover,
-.sidebar-link.active {
-  background: rgba(255, 255, 255, .1);
-  border-left: 3px solid #818cf8;
+.nav-link:hover {
+  color: #ea6a20;
 }
-.sidebar-link.active {
-  background: rgba(67, 97, 238, .2);
+.nav-link.active {
+  color: #b4470f;
+  border-bottom: 2px solid #ea6a20;
+}
+
+/* Card headings */
+.card h3 {
+  font-family: var(--font-serif);
+  color: #6b2a0a;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.card h3.border-b {
+  border-color: #f0e4d7;
 }
 
 /* Tab buttons */
@@ -60,9 +74,9 @@ body {
   cursor: pointer;
 }
 .tab-btn.active {
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
-  color: #1e1b4b;
+  background: #fffdfa;
+  box-shadow: 0 2px 8px rgba(88, 48, 18, .12);
+  color: #6b2a0a;
 }
 
 /* Plotly modebar auto-hide */
@@ -71,8 +85,8 @@ body {
 
 /* Spinner */
 .spinner {
-  border: 3px solid #e2e8f0;
-  border-top-color: #4361ee;
+  border: 3px solid #e9dfd2;
+  border-top-color: #ea6a20;
   border-radius: 50%;
   width: 32px;
   height: 32px;

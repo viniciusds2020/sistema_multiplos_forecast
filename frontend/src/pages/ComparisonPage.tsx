@@ -16,7 +16,7 @@ import type { ComparisonResponse } from '../types/api';
 
 const RESULT_TABS = [
   { key: 'ranking', label: 'Ranking Geral' },
-  { key: 'visual', label: 'Comparacao Visual' },
+  { key: 'visual', label: 'Comparação Visual' },
   { key: 'skus', label: 'Por SKU' },
 ];
 
@@ -88,7 +88,7 @@ export default function ComparisonPage() {
 
   return (
     <div className="fade-in">
-      <PageHeader title="Comparacao de Modelos" subtitle="Avalie e compare o desempenho dos modelos em todos os SKUs" />
+      <PageHeader title="Comparação de Modelos" subtitle="Avalie e compare o desempenho dos modelos em todos os SKUs" />
 
       {/* Controls */}
       <div className="card p-4 mb-6">
@@ -113,7 +113,7 @@ export default function ComparisonPage() {
             </div>
           </div>
           <GradientButton onClick={run} disabled={mutation.isPending}>
-            Executar Comparacao
+            Executar Comparação
           </GradientButton>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function ComparisonPage() {
           {resultTab === 'ranking' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               <div className="card p-5">
-                <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Media por Modelo</h3>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Média por Modelo</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -171,11 +171,11 @@ export default function ComparisonPage() {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div className="card p-5">
-                  <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Radar de Metricas</h3>
+                  <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Radar de Métricas</h3>
                   <PlotlyChart chartJson={data.charts.radar} />
                 </div>
                 <div className="card p-5">
-                  <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Distribuicao WAPE</h3>
+                  <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Distribuição WAPE</h3>
                   <PlotlyChart chartJson={data.charts.box_wape} />
                 </div>
               </div>
@@ -207,7 +207,7 @@ export default function ComparisonPage() {
                 <PlotlyChart chartJson={data.sku_charts[detailSku]} />
               </div>
               <div className="card p-5">
-                <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Metricas do SKU</h3>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Métricas do SKU</h3>
                 <MetricsTable rows={detailRows} />
               </div>
             </>

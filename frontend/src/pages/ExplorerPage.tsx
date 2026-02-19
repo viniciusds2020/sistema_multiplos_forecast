@@ -10,8 +10,8 @@ import { useSkus } from '../hooks/useSkus';
 import { useExplorerDemand, useExplorerClimate, useExplorerDistributions, useExplorerRaw } from '../hooks/useExplorer';
 
 const TABS = [
-  { key: 'demand', label: 'Series de Demanda' },
-  { key: 'climate', label: 'Dados Climaticos' },
+  { key: 'demand', label: 'Séries de Demanda' },
+  { key: 'climate', label: 'Dados Climáticos' },
   { key: 'dist', label: 'Distribuicoes' },
   { key: 'raw', label: 'Dados Brutos' },
 ];
@@ -41,7 +41,7 @@ export default function ExplorerPage() {
 
   return (
     <div className="fade-in">
-      <PageHeader title="Exploracao de Dados" subtitle="Explore as series temporais, dados climaticos e features" />
+      <PageHeader title="Exploração de Dados" subtitle="Explore as séries temporais, dados climáticos e features" />
 
       {/* SKU selector */}
       <div className="card p-4 mb-6">
@@ -68,7 +68,7 @@ export default function ExplorerPage() {
       {/* Demand tab */}
       {activeTab === 'demand' && (
         <div className="card p-5">
-          <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Series de Demanda por SKU</h3>
+          <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Séries de Demanda por SKU</h3>
           {demand.isLoading && <LoadingSpinner />}
           {demand.error && <ErrorMessage message="Erro ao carregar dados" />}
           {demand.data && <PlotlyChart chartJson={demand.data.chart} />}

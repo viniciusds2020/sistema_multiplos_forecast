@@ -99,7 +99,7 @@ export default function SimilarityPage() {
           {/* Row 1: Heatmap + Silhouette */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div className="card p-5">
-              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Matriz de Distancia</h3>
+              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Matriz de Distância</h3>
               <PlotlyChart chartJson={data.charts.dist_heatmap} />
             </div>
             <div className="card p-5">
@@ -111,11 +111,11 @@ export default function SimilarityPage() {
           {/* Row 2: MDS + Dendro */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div className="card p-5">
-              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Projecao MDS 2D</h3>
+              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Projeção MDS 2D</h3>
               <PlotlyChart chartJson={data.charts.mds} />
             </div>
             <div className="card p-5">
-              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Dendrograma Hierarquico</h3>
+              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Dendrograma Hierárquico</h3>
               <PlotlyChart chartJson={data.charts.dendro} />
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function SimilarityPage() {
                       <th className="pb-2 pr-4">SKU</th>
                       <th className="pb-2 pr-4">Nome</th>
                       <th className="pb-2 pr-4">Perfil</th>
-                      <th className="pb-2 pr-4">Media</th>
+                      <th className="pb-2 pr-4">Média</th>
                       <th className="pb-2 pr-4">CV</th>
                       <th className="pb-2">% Zeros</th>
                     </tr>

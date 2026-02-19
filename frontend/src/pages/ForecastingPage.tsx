@@ -86,7 +86,7 @@ export default function ForecastingPage() {
 
   return (
     <div className="fade-in">
-      <PageHeader title="Previsao" subtitle="Treine modelos e gere previsoes por SKU individual ou por cluster agregado" />
+      <PageHeader title="Previsão" subtitle="Treine modelos e gere previsões por SKU individual ou por cluster agregado" />
 
       <div className="max-w-md">
         <TabGroup tabs={MODE_TABS} active={mode} onChange={setMode} />
@@ -126,7 +126,7 @@ export default function ForecastingPage() {
                   className="mt-1 block w-20 rounded-lg border border-gray-200 px-2 py-2 text-sm text-center" />
               </div>
               <GradientButton onClick={runIndividual} disabled={indMutation.isPending}>
-                Executar Previsao
+                Executar Previsão
               </GradientButton>
             </div>
           </div>
@@ -143,13 +143,13 @@ export default function ForecastingPage() {
               </div>
 
               <div className="card p-5 mb-6">
-                <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Comparacao de Previsoes</h3>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Comparação de Previsões</h3>
                 <PlotlyChart chartJson={indData.overlay_chart} />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div className="card p-5">
-                  <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Metricas de Avaliacao</h3>
+                  <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Métricas de Avaliação</h3>
                   <MetricsTable rows={indData.metrics} />
                 </div>
                 <div className="card p-5">
@@ -200,7 +200,7 @@ export default function ForecastingPage() {
                 </div>
               </div>
               <GradientButton onClick={runAggregated} disabled={aggMutation.isPending}>
-                Executar Previsao Agregada
+                Executar Previsão Agregada
               </GradientButton>
             </div>
           </div>

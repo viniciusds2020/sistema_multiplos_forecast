@@ -6,9 +6,11 @@ interface Props {
 export default function PageHeader({ title, subtitle }: Props) {
   return (
     <>
-      <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{title}</h1>
-      <p className="text-sm text-gray-400 mt-1">{subtitle}</p>
-      <div className="h-px bg-gradient-to-r from-brand-500/40 to-transparent mt-4 mb-6" />
+      <h1 className="text-3xl md:text-4xl font-semibold text-brand-900 tracking-tight font-serif">
+        {title}
+      </h1>
+      <p className="text-sm text-gray-500 mt-2 max-w-2xl">{subtitle}</p>
+      <div className="h-px bg-gradient-to-r from-brand-500/60 via-brand-200 to-transparent mt-5 mb-8" />
     </>
   );
 }

@@ -12,7 +12,7 @@ export default function OverviewPage() {
 
   return (
     <div className="fade-in">
-      <PageHeader title="Visao Geral do Dashboard" subtitle="Visao geral do sistema de forecast multi-produto SKU" />
+      <PageHeader title="Visão Geral do Dashboard" subtitle="Visão geral do sistema de forecast multi-produto SKU" />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -21,7 +21,7 @@ export default function OverviewPage() {
             <KpiCard label="Total SKUs" value={kpis.data.total_skus} color="#4361ee" />
             <KpiCard label="Registros" value={kpis.data.total_records.toLocaleString()} color="#06d6a0" />
             <KpiCard label="Cobertura" value={`${kpis.data.coverage_days} dias`} color="#118ab2" />
-            <KpiCard label="Demanda Media" value={`${kpis.data.avg_demand} un/dia`} color="#ffd166" />
+            <KpiCard label="Demanda Média" value={`${kpis.data.avg_demand} un/dia`} color="#ffd166" />
           </>
         )}
       </div>
@@ -50,23 +50,23 @@ export default function OverviewPage() {
               <PlotlyChart chartJson={charts.data.total_demand} />
             </div>
             <div className="lg:col-span-2 card p-5">
-              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Distribuicao por Perfil</h3>
+              <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Distribuição por Perfil</h3>
               <PlotlyChart chartJson={charts.data.profiles} />
             </div>
           </div>
 
           {/* Stats table */}
           <div className="card p-5">
-            <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Estatisticas por Perfil de Demanda</h3>
+            <h3 className="text-sm font-bold text-gray-700 mb-3 pb-2 border-b border-gray-100">Estatísticas por Perfil de Demanda</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                     <th className="pb-3 pr-4">Perfil</th>
                     <th className="pb-3 pr-4">SKUs</th>
-                    <th className="pb-3 pr-4">Media</th>
+                    <th className="pb-3 pr-4">Média</th>
                     <th className="pb-3 pr-4">Desvio</th>
-                    <th className="pb-3 pr-4">Maximo</th>
+                    <th className="pb-3 pr-4">Máximo</th>
                     <th className="pb-3">% Zeros</th>
                   </tr>
                 </thead>
